@@ -59,6 +59,7 @@ public class MainActivity extends AppCompatActivity {
         favoriteChangeListeners.remove(listener);
     }
 
+
     // Notify all favorite change listeners
     public void notifyFavoriteChanged() {
         for (FavoriteChangeListener listener : favoriteChangeListeners) {
@@ -180,52 +181,64 @@ public class MainActivity extends AppCompatActivity {
      * Updated method that just shows/hides fragments rather than adding them repeatedly
      */
     private void showFragment(Fragment fragment) {
-        FragmentTransaction transaction = getSupportFragmentManager().beginTransaction();
-
-        // Add smooth animations
-        transaction.setCustomAnimations(
-                R.anim.fade_in,
-                R.anim.fade_out
-        );
-
-        // Hide all fragments
-        if (homeFragment != null && homeFragment.isAdded()) {
-            transaction.hide(homeFragment);
-        }
-        if (musicFragment != null && musicFragment.isAdded()) {
-            transaction.hide(musicFragment);
-        }
-        if (favoriteFragment != null && favoriteFragment.isAdded()) {
-            transaction.hide(favoriteFragment);
+        if (fragment == null) {
+            Log.e(TAG, "Fragment is null, cannot show");
+            return;
         }
 
-        // Show the selected fragment
-        transaction.show(fragment);
-        transaction.commitAllowingStateLoss();
+        try {
+            FragmentTransaction transaction = getSupportFragmentManager().beginTransaction();
 
-        // If showing music fragment and no track is playing, check if it's a first login
-        if (fragment == musicFragment && musicPlayer.getCurrentTrack() == null) {
-            SharedPreferences prefs = getSharedPreferences("MelodixPrefs", MODE_PRIVATE);
-            boolean isFirstMusicVisit = prefs.getBoolean("isFirstMusicVisit", true);
+            // Add smooth animations
+            transaction.setCustomAnimations(
+                    R.anim.fade_in,
+                    R.anim.fade_out
+            );
 
-            if (isFirstMusicVisit) {
-                // Mark that first visit has occurred
-                prefs.edit().putBoolean("isFirstMusicVisit", false).apply();
-
-                // Load a random track
-                loadRandomTrack();
+            // Hide all fragments
+            if (homeFragment != null && homeFragment.isAdded()) {
+                transaction.hide(homeFragment);
             }
-        }
-
-        if (fragment == homeFragment) {
-            homeFragment.refreshRecentlyPlayed();
-        }
-
-        if (fragment == musicFragment && currentTrack != null) {
-            // If we have a current track, make sure MusicFragment shows it
-            for (TrackChangeListener listener : trackChangeListeners) {
-                listener.onTrackChanged(currentTrack);
+            if (musicFragment != null && musicFragment.isAdded()) {
+                transaction.hide(musicFragment);
             }
+            if (favoriteFragment != null && favoriteFragment.isAdded()) {
+                transaction.hide(favoriteFragment);
+            }
+
+            // Show the selected fragment
+            transaction.show(fragment);
+            transaction.commitAllowingStateLoss();
+
+            // If showing music fragment and no track is playing, check if it's a first login
+            if (fragment == musicFragment && musicPlayer.getCurrentTrack() == null) {
+                SharedPreferences prefs = getSharedPreferences("MelodixPrefs", MODE_PRIVATE);
+                boolean isFirstMusicVisit = prefs.getBoolean("isFirstMusicVisit", true);
+
+                if (isFirstMusicVisit) {
+                    // Mark that first visit has occurred
+                    prefs.edit().putBoolean("isFirstMusicVisit", false).apply();
+
+                    // Load a random track
+                    loadRandomTrack();
+                }
+            }
+
+            if (fragment == homeFragment) {
+                homeFragment.refreshRecentlyPlayed();
+            }
+
+            if (fragment == musicFragment && musicPlayer.getCurrentTrack() != null) {
+                // If we have a current track, make sure MusicFragment shows it
+                for (TrackChangeListener listener : trackChangeListeners) {
+                    if (listener != null) {
+                        listener.onTrackChanged(musicPlayer.getCurrentTrack());
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error showing fragment: " + e.getMessage(), e);
+            Toast.makeText(this, "Error during navigation. Please try again.", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -315,52 +328,124 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onSuccess(List<Track> data) {
                 if (data != null && !data.isEmpty()) {
-                    // Select a random track from results
-                    int randomIndex = (int) (Math.random() * Math.min(data.size(), 10));
-                    Track randomTrack = data.get(randomIndex);
+                    try {
+                        // Select a random track from results
+                        int randomIndex = (int) (Math.random() * Math.min(data.size(), 10));
+                        Track randomTrack = data.get(randomIndex);
 
-                    // Play the random track
-                    runOnUiThread(() -> playTrack(randomTrack));
+                        // Play the random track
+                        runOnUiThread(() -> playTrack(randomTrack));
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error selecting random track: " + e.getMessage(), e);
+                        // Fallback to first track if there's a problem with random selection
+                        if (!data.isEmpty()) {
+                            final Track fallbackTrack = data.get(0);
+                            runOnUiThread(() -> {
+                                Toast.makeText(MainActivity.this,
+                                    "Error with random selection, playing first available track",
+                                    Toast.LENGTH_SHORT).show();
+                                playTrack(fallbackTrack);
+                            });
+                        } else {
+                            runOnUiThread(() ->
+                                Toast.makeText(MainActivity.this,
+                                    "No tracks available to play",
+                                    Toast.LENGTH_SHORT).show());
+                        }
+                    }
+                } else {
+                    runOnUiThread(() ->
+                        Toast.makeText(MainActivity.this,
+                            "No music found for " + randomTerm + ", try again later",
+                            Toast.LENGTH_SHORT).show());
+
+                    // Try with a different search term as fallback
+                    String fallbackTerm = "top hits";
+                    Log.d(TAG, "Trying fallback search term: " + fallbackTerm);
+                    repository.searchTracks(fallbackTerm, new DeezerRepository.DataCallback<List<Track>>() {
+                        @Override
+                        public void onSuccess(List<Track> fallbackData) {
+                            if (fallbackData != null && !fallbackData.isEmpty()) {
+                                // Use first track from fallback search
+                                Track fallbackTrack = fallbackData.get(0);
+                                runOnUiThread(() -> playTrack(fallbackTrack));
+                            } else {
+                                runOnUiThread(() ->
+                                    Toast.makeText(MainActivity.this,
+                                        "Could not load music. Please try again later.",
+                                        Toast.LENGTH_SHORT).show());
+                            }
+                        }
+
+                        @Override
+                        public void onError(String message) {
+                            runOnUiThread(() ->
+                                Toast.makeText(MainActivity.this,
+                                    "Couldn't load music: " + message,
+                                    Toast.LENGTH_SHORT).show());
+                        }
+                    });
                 }
             }
 
             @Override
             public void onError(String message) {
-                runOnUiThread(() -> Toast.makeText(MainActivity.this,
-                        "Couldn't load music: " + message, Toast.LENGTH_SHORT).show());
+                Log.e(TAG, "Error loading music: " + message);
+                runOnUiThread(() ->
+                    Toast.makeText(MainActivity.this,
+                        "Couldn't load music: " + message,
+                        Toast.LENGTH_SHORT).show());
             }
         });
     }
 
     private void addToRecentlyPlayed(Track track) {
-        // Get current list of recently played tracks
-        SharedPreferences prefs = getSharedPreferences("MelodixPrefs", MODE_PRIVATE);
-        Gson gson = new Gson();
-        String json = prefs.getString("recentTracks", null);
-        List<Track> recentTracks;
-
-        if (json == null) {
-            recentTracks = new ArrayList<>();
-        } else {
-            Type type = new TypeToken<ArrayList<Track>>() {}.getType();
-            recentTracks = gson.fromJson(json, type);
+        if (track == null) {
+            Log.e(TAG, "Cannot add null track to recently played");
+            return;
         }
 
-        // Remove track if it already exists (to avoid duplicates)
-        recentTracks.removeIf(t -> t.getId() == track.getId());
+        try {
+            // Get current list of recently played tracks
+            SharedPreferences prefs = getSharedPreferences("MelodixPrefs", MODE_PRIVATE);
+            Gson gson = new Gson();
+            String json = prefs.getString("recentTracks", null);
+            List<Track> recentTracks = new ArrayList<>();
 
-        // Add track to the beginning of the list
-        recentTracks.add(0, track);
+            if (json != null) {
+                try {
+                    Type type = new TypeToken<ArrayList<Track>>() {}.getType();
+                    recentTracks = gson.fromJson(json, type);
 
-        // Keep only the most recent tracks (e.g., 10)
-        if (recentTracks.size() > 10) {
-            recentTracks = recentTracks.subList(0, 10);
+                    // Handle potential null value from parsing
+                    if (recentTracks == null) {
+                        recentTracks = new ArrayList<>();
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Error parsing recently played tracks: " + e.getMessage(), e);
+                    // Reset to empty list if there's a parsing error
+                    recentTracks = new ArrayList<>();
+                }
+            }
+
+            // Remove track if it already exists (to avoid duplicates)
+            recentTracks.removeIf(t -> t != null && t.getId() == track.getId());
+
+            // Add track to the beginning of the list
+            recentTracks.add(0, track);
+
+            // Keep only the most recent tracks (e.g., 10)
+            if (recentTracks.size() > 10) {
+                recentTracks = new ArrayList<>(recentTracks.subList(0, 10));
+            }
+
+            // Save the updated list
+            SharedPreferences.Editor editor = prefs.edit();
+            editor.putString("recentTracks", gson.toJson(recentTracks));
+            editor.apply();
+        } catch (Exception e) {
+            Log.e(TAG, "Error updating recently played tracks: " + e.getMessage(), e);
         }
-
-        // Save the updated list
-        SharedPreferences.Editor editor = prefs.edit();
-        editor.putString("recentTracks", gson.toJson(recentTracks));
-        editor.apply();
     }
 
     @Override

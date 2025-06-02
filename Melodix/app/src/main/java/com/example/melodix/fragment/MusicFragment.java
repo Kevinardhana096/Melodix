@@ -21,6 +21,7 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import com.bumptech.glide.Glide;
+import com.example.melodix.DeezerRepository;
 import com.example.melodix.MainActivity;
 import com.example.melodix.MusicPlayer;
 import com.example.melodix.R;
@@ -344,10 +345,56 @@ public class MusicFragment extends Fragment implements TrackChangeListener {
                 Toast.makeText(getContext(), "Could not play next track", Toast.LENGTH_SHORT).show();
             }
         } else {
-            Log.d(TAG, "No next track available");
-            Toast.makeText(getContext(), "No next track available", Toast.LENGTH_SHORT).show();
+            // Instead of showing "No next track available", fetch and play a random track
+            Log.d(TAG, "No next track in queue, playing a random track instead");
+            Toast.makeText(getContext(), "Playing a random track...", Toast.LENGTH_SHORT).show();
+            playRandomTrack();
         }
     }
+    private void playRandomTrack() {
+        // Get repository instance
+        DeezerRepository repository = DeezerRepository.getInstance();
+
+        // Fetch top tracks which we can use as a source for random selection
+        repository.getTopTracks(new DeezerRepository.DataCallback<List<Track>>() {
+            @Override
+            public void onSuccess(List<Track> tracks) {
+                if (tracks != null && !tracks.isEmpty()) {
+                    // Get a random index
+                    int randomIndex = (int) (Math.random() * tracks.size());
+                    Track randomTrack = tracks.get(randomIndex);
+
+                    // Set context on the track
+                    if (getContext() != null) {
+                        randomTrack.setContext(getContext());
+                    }
+
+                    // Play the random track
+                    if (isAdded()) {
+                        requireActivity().runOnUiThread(() -> {
+                            musicPlayer.prepareFromUrl(requireContext(), randomTrack);
+                        });
+                    }
+                } else {
+                    if (isAdded()) {
+                        requireActivity().runOnUiThread(() -> {
+                            Toast.makeText(getContext(), "No tracks available to play", Toast.LENGTH_SHORT).show();
+                        });
+                    }
+                }
+            }
+
+            @Override
+            public void onError(String message) {
+                if (isAdded()) {
+                    requireActivity().runOnUiThread(() -> {
+                        Toast.makeText(getContext(), "Error fetching random track: " + message, Toast.LENGTH_SHORT).show();
+                    });
+                }
+            }
+        });
+    }
+
 
     private void skipToPreviousTrack() {
         boolean success = musicPlayer.playPreviousTrack();

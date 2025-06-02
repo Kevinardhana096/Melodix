@@ -42,31 +42,22 @@ public class RecentlyPlayedAdapter extends RecyclerView.Adapter<RecentlyPlayedAd
     public class ViewHolder extends RecyclerView.ViewHolder {
         ImageView albumArt;
         TextView songName;
+        TextView artistName;
         ProgressBar progressBarImage;
-        ProgressBar progressBarText;
 
         public ViewHolder(@NonNull View itemView) {
             super(itemView);
-            albumArt = itemView.findViewById(R.id.ivAlbumArt);
-            songName = itemView.findViewById(R.id.tvSongName);
+            albumArt = itemView.findViewById(R.id.img_album);
+            songName = itemView.findViewById(R.id.txt_song_title);
+            artistName = itemView.findViewById(R.id.txt_artist);
             progressBarImage = itemView.findViewById(R.id.progressBarImage);
-            progressBarText = itemView.findViewById(R.id.progressBarText);
 
-            itemView.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    int position = getAdapterPosition();
-                    if (position != RecyclerView.NO_POSITION && listener != null) {
-                        listener.onItemClick(tracks.get(position));
-                    }
+            itemView.setOnClickListener(v -> {
+                int position = getAdapterPosition();
+                if (position != RecyclerView.NO_POSITION && listener != null) {
+                    listener.onItemClick(tracks.get(position));
                 }
             });
-        }
-
-        // Show loading state for text content
-        public void showTextLoading(boolean isLoading) {
-            progressBarText.setVisibility(isLoading ? View.VISIBLE : View.GONE);
-            songName.setVisibility(isLoading ? View.INVISIBLE : View.VISIBLE);
         }
 
         // Show loading state for image content
@@ -88,15 +79,14 @@ public class RecentlyPlayedAdapter extends RecyclerView.Adapter<RecentlyPlayedAd
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         Track track = tracks.get(position);
 
-        // Show loading states initially
-        holder.showTextLoading(true);
+        // Show loading state initially
         holder.showImageLoading(true);
 
-        // Set song name with a slight delay to simulate loading
-        holder.itemView.postDelayed(() -> {
-            holder.songName.setText(track.getTitle());
-            holder.showTextLoading(false);
-        }, 300);
+        // Set text data
+        holder.songName.setText(track.getTitle());
+        if (track.getArtist() != null) {
+            holder.artistName.setText(track.getArtist().getName());
+        }
 
         // Load album art using Glide with loading state
         if (track.getAlbum() != null && track.getAlbum().getCoverMedium() != null) {

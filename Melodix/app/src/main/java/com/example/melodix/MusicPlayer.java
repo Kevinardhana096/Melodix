@@ -173,8 +173,21 @@ public class MusicPlayer {
      */
     public boolean playRandomTrack() {
         // Check if we have a valid playlist
-        if (playlist.isEmpty() || playlist.size() <= 1) {
+        if (playlist.isEmpty()) {
+            Log.e(TAG, "Cannot play random track: playlist is empty");
             return false;
+        }
+
+        // If we only have one track, just replay it
+        if (playlist.size() == 1) {
+            currentTrackIndex = 0;
+            Context context = getValidContext();
+            if (context == null) {
+                Log.e(TAG, "Cannot play track: context is null");
+                return false;
+            }
+            prepareFromUrl(context, playlist.get(0));
+            return true;
         }
 
         // Jika semua lagu dalam playlist sudah dimainkan, reset daftar lagu yang sudah diputar
@@ -182,7 +195,9 @@ public class MusicPlayer {
             Log.d(TAG, "All tracks have been played, resetting play history");
             playedTrackIndices.clear();
             // Tetap simpan lagu yang sedang diputar dalam daftar lagu yang sudah dimainkan
-            playedTrackIndices.add(currentTrackIndex);
+            if (currentTrackIndex >= 0 && currentTrackIndex < playlist.size()) {
+                playedTrackIndices.add(currentTrackIndex);
+            }
         }
 
         // Pilih indeks secara acak yang belum pernah diputar
@@ -196,11 +211,19 @@ public class MusicPlayer {
             // Lanjutkan loop jika lagu yang dipilih sudah dimainkan sebelumnya atau sama dengan lagu saat ini
             if (attempts > maxAttempts) {
                 // Jika terlalu banyak percobaan, pilih indeks pertama yang belum dimainkan
+                boolean foundUnplayed = false;
                 for (int i = 0; i < playlist.size(); i++) {
                     if (!playedTrackIndices.contains(i)) {
                         randomIndex = i;
+                        foundUnplayed = true;
                         break;
                     }
+                }
+
+                // Jika semua lagu sudah dimainkan, pilih lagu yang pertama kali dimainkan
+                if (!foundUnplayed && !playlist.isEmpty()) {
+                    randomIndex = 0;
+                    playedTrackIndices.clear(); // Reset played history
                 }
                 break;
             }
@@ -209,13 +232,16 @@ public class MusicPlayer {
         // Simpan indeks lagu yang akan diputar
         playedTrackIndices.add(randomIndex);
         currentTrackIndex = randomIndex;
+
+        if (currentTrackIndex < 0 || currentTrackIndex >= playlist.size()) {
+            Log.e(TAG, "Invalid track index: " + currentTrackIndex + ", playlist size: " + playlist.size());
+            return false;
+        }
+
         Log.d(TAG, "Playing track index " + randomIndex + ", played history size: " + playedTrackIndices.size());
 
-        // Get the context from the current application
-        Context context = MelodixApplication.getAppContext();
-        if (context == null && currentTrack != null) {
-            context = currentTrack.getContext();
-        }
+        // Get a valid context
+        Context context = getValidContext();
 
         // Prepare and play the random track
         if (context != null) {
@@ -236,6 +262,37 @@ public class MusicPlayer {
     }
 
     /**
+     * Helper method to get a valid context using multiple fallback strategies
+     */
+    private Context getValidContext() {
+        Context context = null;
+
+        // Try to get context from application first
+        try {
+            context = MelodixApplication.getAppContext();
+        } catch (Exception e) {
+            Log.w(TAG, "Could not get application context: " + e.getMessage());
+        }
+
+        // Try to get context from current track as fallback
+        if (context == null && currentTrack != null) {
+            context = currentTrack.getContext();
+        }
+
+        // Try to get context from any track in the playlist as last resort
+        if (context == null && !playlist.isEmpty()) {
+            for (Track track : playlist) {
+                if (track != null && track.getContext() != null) {
+                    context = track.getContext();
+                    break;
+                }
+            }
+        }
+
+        return context;
+    }
+
+    /**
      * Play the next track in the playlist if available
      * Changed to play a random track instead of the sequential next one
      *
@@ -252,36 +309,36 @@ public class MusicPlayer {
      * @return true if successfully switched to previous track, false otherwise
      */
     public boolean playPreviousTrack() {
-        // Check if we have a valid playlist and we're not at the beginning
-        // or if current position is past 3 seconds, restart the current track
+        // Check if we have a valid playlist
+        if (playlist.isEmpty()) {
+            Log.e(TAG, "Cannot play previous track: playlist is empty");
+            return false;
+        }
+
+        // If current position is past 3 seconds, restart the current track
         if (getCurrentPosition() > 3000) {
             // If we're more than 3 seconds in, restart current track
             seekTo(0);
             return true;
         }
 
-        if (playlist.isEmpty() || currentTrackIndex <= 0) {
-            return false;
+        // Check if we're already at the first track
+        if (currentTrackIndex <= 0) {
+            // If at first track, just restart it
+            seekTo(0);
+            return true;
         }
 
         // Move to previous track
         currentTrackIndex--;
 
-        // Get the context from the current application
-        Context context = null;
-        if (currentTrack != null) {
-            // Try to get context from the track first
-            context = currentTrack.getContext();
+        // Ensure index is valid (defensive programming)
+        if (currentTrackIndex < 0) {
+            currentTrackIndex = 0;
         }
 
-        // If that fails, try to use the application context as fallback
-        if (context == null) {
-            try {
-                context = MelodixApplication.getAppContext();
-            } catch (Exception e) {
-                Log.e(TAG, "Could not get application context", e);
-            }
-        }
+        // Get a valid context using our helper method
+        Context context = getValidContext();
 
         // Prepare and play the previous track
         if (context != null) {
@@ -327,6 +384,13 @@ public class MusicPlayer {
             return;
         }
 
+        if (context == null) {
+            if (playbackStatusListener != null) {
+                playbackStatusListener.onError("Context is null, cannot prepare media player");
+            }
+            return;
+        }
+
         currentTrack = track;
         // Store context in track for later use
         track.setContext(context);
@@ -359,6 +423,11 @@ public class MusicPlayer {
             Log.e(TAG, "MediaPlayer in illegal state", e);
             if (playbackStatusListener != null) {
                 playbackStatusListener.onError("MediaPlayer error: " + e.getMessage());
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Unexpected error in media player", e);
+            if (playbackStatusListener != null) {
+                playbackStatusListener.onError("Unexpected error: " + e.getMessage());
             }
         }
     }

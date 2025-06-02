@@ -18,6 +18,10 @@ public class SearchResultAdapter extends RecyclerView.Adapter<SearchResultAdapte
 
     private List<Track> searchResults;
     private OnSearchItemClickListener listener;
+    // Add inside SearchResultAdapter
+    public List<Track> getCurrentResults() {
+        return new ArrayList<>(searchResults);
+    }
 
     public SearchResultAdapter(OnSearchItemClickListener listener) {
         this.searchResults = new ArrayList<>();
@@ -50,6 +54,7 @@ public class SearchResultAdapter extends RecyclerView.Adapter<SearchResultAdapte
         }
         notifyDataSetChanged();
     }
+
 
     public class SearchViewHolder extends RecyclerView.ViewHolder {
         private ImageView imgAlbumArt;
@@ -106,4 +111,5 @@ public class SearchResultAdapter extends RecyclerView.Adapter<SearchResultAdapte
         void onSearchItemClick(Track track);
         void onSearchItemPlayClick(Track track);
     }
+
 }

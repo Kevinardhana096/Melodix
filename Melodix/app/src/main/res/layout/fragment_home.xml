@@ -7,6 +7,13 @@
     android:background="?android:colorBackground"
     tools:context=".fragment.HomeFragment">
 
+    <!-- Include search panel layout that will slide in from top -->
+    <include
+        android:id="@+id/search_panel_include"
+        layout="@layout/search_panel"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
     <androidx.core.widget.NestedScrollView
         android:id="@+id/nested_scroll_view"
         android:layout_width="match_parent"
@@ -409,16 +416,5 @@
             </androidx.constraintlayout.widget.ConstraintLayout>
         </androidx.constraintlayout.widget.ConstraintLayout>
     </androidx.core.widget.NestedScrollView>
-
-    <!-- Include Search Panel that will slide down from top -->
-    <include
-        android:id="@+id/search_panel_include"
-        layout="@layout/layout_search_panel"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_gravity="top"
-        android:layout_marginStart="16dp"
-        android:layout_marginTop="16dp"
-        android:layout_marginEnd="16dp" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

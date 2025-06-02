@@ -13,12 +13,16 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import android.os.Handler;
 import android.os.Looper;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
+import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -70,21 +74,7 @@ public class HomeFragment extends Fragment implements RecentlyPlayedAdapter.OnIt
     private Runnable searchRunnable;
 
     @Override
-    public void onItemClick(Track track) {
-        
-    }
-
-    // Current search type
-    private enum SearchType { SONGS, ARTISTS, ALBUMS }
-    private SearchType currentSearchType = SearchType.SONGS;
-
-    public HomeFragment() {
-        // Required empty public constructor
-    }
-
-    @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container,
-                             Bundle savedInstanceState) {
+    public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         // Inflate the layout for this fragment
         return inflater.inflate(R.layout.fragment_home, container, false);
     }
@@ -98,202 +88,465 @@ public class HomeFragment extends Fragment implements RecentlyPlayedAdapter.OnIt
 
         // Initialize views
         recyclerNewMusic = view.findViewById(R.id.recycler_new_music);
-        TextView txtTitle = view.findViewById(R.id.txt_title);
-        TextView txtUsername = view.findViewById(R.id.txt_username);
-        TextView txtEmail = view.findViewById(R.id.txt_email);
-
-        // Fix: Use profile_image instead of img_profile
-        ImageView profileImage = view.findViewById(R.id.profile_image);
 
         // Initialize search panel elements
-        setupSearchPanel(view);
-
-        // Enhance the search functionality for the regular search box
-        EditText editSearch = view.findViewById(R.id.edit_search);
-        editSearch.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
-
-        // Make the main search box clickable to show the search panel instead of doing a direct search
-        editSearch.setFocusable(false);
-        editSearch.setClickable(true);
-        editSearch.setOnClickListener(v -> {
-            showSearchPanel();
-        });
-
-        // Add click listener for the search card to show search panel
+        searchPanel = view.findViewById(R.id.search_panel_include);
+        searchPanelEditText = view.findViewById(R.id.edit_search_panel);
+        searchCloseButton = view.findViewById(R.id.btn_search_close);  // Fix this line
         cardSearch = view.findViewById(R.id.card_search);
-        cardSearch.setOnClickListener(v -> {
-            showSearchPanel();
-        });
+        recyclerSearchResults = view.findViewById(R.id.recycler_search_results);
+        progressSearch = view.findViewById(R.id.progress_search);
+        txtSearchResults = view.findViewById(R.id.txt_search_results);
 
-        // Add clear button for search field
-        ImageView imgSearch = view.findViewById(R.id.img_search);
-        imgSearch.setOnClickListener(v -> {
-            editSearch.setText("");
-            loadDefaultContent();
-        });
+        // Initialize chip group for search filtering
+        chipGroup = view.findViewById(R.id.chip_group);
+        chipSongs = view.findViewById(R.id.chip_songs);
+        chipArtists = view.findViewById(R.id.chip_artists);
+        chipAlbums = view.findViewById(R.id.chip_albums);
 
-        // Set user information
-        txtUsername.setText(R.string.username_example);
-        txtEmail.setText(R.string.email_example);
+        // Connect the main search edit text to show search panel
+        EditText mainSearchEditText = view.findViewById(R.id.edit_search);
+        if (mainSearchEditText != null) {
+            mainSearchEditText.setOnClickListener(v -> showSearchPanel());
+            mainSearchEditText.setFocusable(false); // Make it just trigger the search panel
+        }
 
-        // Set click listeners for profile navigation
-        View.OnClickListener profileClickListener = v -> {
-            Intent intent = new Intent(getActivity(), ProfileActivity.class);
-            startActivity(intent);
-        };
+        // Setup click listeners for search
+        if (cardSearch != null) {
+            cardSearch.setOnClickListener(v -> showSearchPanel());
+        }
 
-        // Apply the click listener to both the profile image and username
-        // Fix: Use profileImage variable instead of imgProfile
-        profileImage.setOnClickListener(profileClickListener);
-        txtUsername.setOnClickListener(profileClickListener);
+        if (searchCloseButton != null) {
+            searchCloseButton.setOnClickListener(v -> hideSearchPanel());
+        }
 
-        // Setup Recently Played section
+        // Add this line to set up all search listeners
+        setupSearchListeners();
+
+        // Initialize profile elements
+        ImageView profileImage = view.findViewById(R.id.profile_image);
+        ImageView btnThemeMode = view.findViewById(R.id.btn_theme_mode);
+
+        // Set theme toggle click listener
+        if (btnThemeMode != null) {
+            btnThemeMode.setOnClickListener(v -> {
+                ThemeManager.toggleTheme(requireActivity());
+            });
+        }
+
+        // Hide search panel initially
+        if (searchPanel != null) {
+            searchPanel.setVisibility(View.GONE);
+        }
+
+        // Initialize search results adapter
+        searchResultAdapter = new SearchResultAdapter(this);
+        if (recyclerSearchResults != null) {
+            recyclerSearchResults.setLayoutManager(new LinearLayoutManager(getContext()));
+            recyclerSearchResults.setAdapter(searchResultAdapter);
+        }
+
+        // Load content
         setupRecentlyPlayed();
-
-        // Setup RecyclerView untuk New Music
         setupNewMusic();
-
-        // Load data from Deezer API and check API status
-        checkApiStatus();
-
-        // Set up theme toggle button
-        ImageView imgThemeMode = view.findViewById(R.id.btn_theme_mode);
-        updateThemeIcon(imgThemeMode);
-
-        imgThemeMode.setOnClickListener(v -> {
-            ThemeManager.toggleTheme(requireContext());
-            updateThemeIcon(imgThemeMode);
-
-            // Recreate the activity to apply theme changes
-            requireActivity().recreate();
-        });
     }
 
-    private void setupSearchPanel(View view) {
-        // Find search panel views from the included layout
-        View panelInclude = view.findViewById(R.id.search_panel_include);
-        searchPanel = panelInclude.findViewById(R.id.search_panel);
-        searchPanelEditText = panelInclude.findViewById(R.id.edit_search_panel);
-        searchCloseButton = panelInclude.findViewById(R.id.btn_search_close);
-        recyclerSearchResults = panelInclude.findViewById(R.id.recycler_search_results);
-        progressSearch = panelInclude.findViewById(R.id.progress_search);
-        txtSearchResults = panelInclude.findViewById(R.id.txt_search_results);
-        chipGroup = panelInclude.findViewById(R.id.chip_group);
-        chipSongs = panelInclude.findViewById(R.id.chip_songs);
-        chipArtists = panelInclude.findViewById(R.id.chip_artists);
-        chipAlbums = panelInclude.findViewById(R.id.chip_albums);
-
-        // Set up RecyclerView for search results
-        recyclerSearchResults.setLayoutManager(new LinearLayoutManager(getContext()));
-        searchResultAdapter = new SearchResultAdapter(this);
-        recyclerSearchResults.setAdapter(searchResultAdapter);
-
-        // Set up search text listener for the search panel
-        searchPanelEditText.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
-        searchPanelEditText.addTextChangedListener(new android.text.TextWatcher() {
+    private void setupSearchListeners() {
+        // Set up search text change listener
+        searchPanelEditText.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
 
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
+                // Cancel any pending searches
                 if (searchRunnable != null) {
                     searchHandler.removeCallbacks(searchRunnable);
                 }
 
                 final String query = s.toString().trim();
-                searchRunnable = () -> {
-                    if (query.isEmpty()) {
-                        searchResultAdapter.updateResults(new ArrayList<>());
-                        txtSearchResults.setText(R.string.enter_search_terms);
-                        return;
-                    }
-                    performPanelSearch(query);
-                };
+
+                // Clear results if query is empty
+                if (query.isEmpty()) {
+                    txtSearchResults.setText("Enter search terms");
+                    searchResultAdapter.updateResults(null);
+                    return;
+                }
+
+                // Show loading indicator
+                progressSearch.setVisibility(View.VISIBLE);
+                txtSearchResults.setText("Searching...");
+
+                // Create new search with delay
+                searchRunnable = () -> performSearch(query);
                 searchHandler.postDelayed(searchRunnable, SEARCH_DELAY_MS);
             }
 
             @Override
-            public void afterTextChanged(android.text.Editable s) {}
+            public void afterTextChanged(Editable s) {}
         });
 
-        // Set up close button listener
-        searchCloseButton.setOnClickListener(v -> {
-            hideSearchPanel();
-        });
-
-        // Set up chip group listener
-        chipGroup.setOnCheckedChangeListener((group, checkedId) -> {
-            if (checkedId == R.id.chip_songs) {
+        // Set up search type filter listeners
+        chipSongs.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (isChecked) {
                 currentSearchType = SearchType.SONGS;
-            } else if (checkedId == R.id.chip_artists) {
-                currentSearchType = SearchType.ARTISTS;
-            } else if (checkedId == R.id.chip_albums) {
-                currentSearchType = SearchType.ALBUMS;
+                String query = searchPanelEditText.getText().toString().trim();
+                if (!query.isEmpty()) {
+                    performSearch(query);
+                }
             }
+        });
 
-            String query = searchPanelEditText.getText().toString().trim();
-            if (!query.isEmpty()) {
-                performPanelSearch(query);
+        chipArtists.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (isChecked) {
+                currentSearchType = SearchType.ARTISTS;
+                String query = searchPanelEditText.getText().toString().trim();
+                if (!query.isEmpty()) {
+                    performSearch(query);
+                }
             }
+        });
+
+        chipAlbums.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (isChecked) {
+                currentSearchType = SearchType.ALBUMS;
+                String query = searchPanelEditText.getText().toString().trim();
+                if (!query.isEmpty()) {
+                    performSearch(query);
+                }
+            }
+        });
+
+        // Setup keyboard search action
+        searchPanelEditText.setOnEditorActionListener((v, actionId, event) -> {
+            if (actionId == EditorInfo.IME_ACTION_SEARCH) {
+                String query = searchPanelEditText.getText().toString().trim();
+                if (!query.isEmpty()) {
+                    performSearch(query);
+                }
+                return true;
+            }
+            return false;
         });
     }
-
-    private void performPanelSearch(String query) {
+    private void performSearch(String query) {
+        // Show loading state
         progressSearch.setVisibility(View.VISIBLE);
+        txtSearchResults.setText("Searching for \"" + query + "\"...");
 
-        // Gunakan metode searchTracks yang tersedia di DeezerRepository
-        // Karena tidak ada metode search dengan parameter SearchType
+        // Select the appropriate search method based on filter
+        switch (currentSearchType) {
+            case SONGS:
+                searchSongs(query);
+                break;
+            case ARTISTS:
+                searchArtists(query);
+                break;
+            case ALBUMS:
+                searchAlbums(query);
+                break;
+        }
+    }
+
+    private void searchSongs(String query) {
         repository.searchTracks(query, new DeezerRepository.DataCallback<List<Track>>() {
             @Override
             public void onSuccess(List<Track> data) {
-                if (getActivity() != null && isAdded()) {
-                    getActivity().runOnUiThread(() -> {
-                        progressSearch.setVisibility(View.GONE);
-                        updateSearchResults(data);
-                    });
-                }
+                if (getActivity() == null || !isAdded()) return;
+
+                getActivity().runOnUiThread(() -> {
+                    progressSearch.setVisibility(View.GONE);
+
+                    if (data != null && !data.isEmpty()) {
+                        searchResultAdapter.updateResults(data);
+                        txtSearchResults.setText("Found " + data.size() + " songs");
+                    } else {
+                        searchResultAdapter.updateResults(null);
+                        txtSearchResults.setText("No songs found");
+                    }
+                });
             }
 
             @Override
             public void onError(String message) {
-                handleSearchError(message);
+                if (getActivity() == null || !isAdded()) return;
+
+                getActivity().runOnUiThread(() -> {
+                    progressSearch.setVisibility(View.GONE);
+                    txtSearchResults.setText("Error: " + message);
+                    searchResultAdapter.updateResults(null);
+                    Log.e(TAG, "Search error: " + message);
+                });
             }
         });
     }
 
-    private void updateSearchResults(List<Track> results) {
-        if (results.isEmpty()) {
-            txtSearchResults.setText(R.string.no_results);
-        } else {
-            txtSearchResults.setText(getString(R.string.results_found, results.size()));
-        }
-        searchResultAdapter.updateResults(results);
+    private void searchArtists(String query) {
+        // Similar to searchSongs but using repository.searchArtists
+        // Replace with the appropriate method call to your repository
+        txtSearchResults.setText("Artist search not implemented yet");
+        progressSearch.setVisibility(View.GONE);
     }
 
-    private void handleSearchError(String message) {
-        if (getActivity() != null && isAdded()) {
-            getActivity().runOnUiThread(() -> {
-                progressSearch.setVisibility(View.GONE);
-                Toast.makeText(getContext(), getString(R.string.search_error) + ": " + message, Toast.LENGTH_SHORT).show();
-            });
+    private void searchAlbums(String query) {
+        // Similar to searchSongs but using repository.searchAlbums
+        // Replace with the appropriate method call to your repository
+        txtSearchResults.setText("Album search not implemented yet");
+        progressSearch.setVisibility(View.GONE);
+    }
+    @Override
+    public void onItemClick(Track track) {
+        if (track == null || getActivity() == null) return;
+
+        // Play the clicked track
+        if (getActivity() instanceof MainActivity) {
+            MainActivity mainActivity = (MainActivity) getActivity();
+            mainActivity.playTrack(track);
+            Log.d(TAG, "Playing track: " + track.getTitle());
         }
     }
 
-    // Implement SearchResultAdapter.OnSearchItemClickListener methods
     @Override
     public void onSearchItemClick(Track track) {
-        // Play the selected track
-        if (getActivity() instanceof MainActivity) {
-            ((MainActivity) getActivity()).playTrack(track);
-        }
+        // Same behavior as regular item click
+        onItemClick(track);
+
+        // Hide the search panel after clicking a search result
         hideSearchPanel();
     }
-
     @Override
     public void onSearchItemPlayClick(Track track) {
-        // Play the selected track immediately
-        if (getActivity() instanceof MainActivity) {
-            ((MainActivity) getActivity()).playTrack(track);
+        // Play the clicked track immediately
+        onItemClick(track);
+    }
+    private void showSearchPanel() {
+        if (searchPanel != null) {
+            searchPanel.setVisibility(View.VISIBLE);
+            searchPanelEditText.requestFocus();
+
+            // Show keyboard
+            InputMethodManager imm = (InputMethodManager) getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (imm != null) {
+                imm.showSoftInput(searchPanelEditText, InputMethodManager.SHOW_IMPLICIT);
+            }
         }
+    }
+
+    private void hideSearchPanel() {
+        if (searchPanel != null) {
+            searchPanel.setVisibility(View.GONE);
+
+            // Hide keyboard
+            InputMethodManager imm = (InputMethodManager) getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (imm != null) {
+                imm.hideSoftInputFromWindow(searchPanelEditText.getWindowToken(), 0);
+            }
+
+            // Clear search field
+            searchPanelEditText.setText("");
+        }
+    }
+
+    private void loadDefaultContent() {
+        // Reload recently played and new music sections
+        setupRecentlyPlayed();
+        setupNewMusic();
+    }
+
+    public List<Track> getAllFilteredTracks() {
+        // Return all tracks from new music section
+        if (newMusicAdapter != null) {
+            return newMusicAdapter.getAllFilteredTracks(); // Changed from getAllTracks to getAllFilteredTracks
+        }
+        return new ArrayList<>();
+    }
+
+    // Current search type
+    private enum SearchType { SONGS, ARTISTS, ALBUMS }
+    private SearchType currentSearchType = SearchType.SONGS;
+
+    public HomeFragment() {
+        // Required empty public constructor
+    }
+
+    private void setupRecentlyPlayed() {
+        if (getContext() == null || getView() == null) return;
+
+        // Find the HorizontalScrollView and its child LinearLayout
+        HorizontalScrollView scrollRecentlyPlayed = getView().findViewById(R.id.scroll_recently_played);
+        if (scrollRecentlyPlayed == null) {
+            Log.e(TAG, "Recently played ScrollView not found");
+            return;
+        }
+
+        // Find the LinearLayout inside the HorizontalScrollView
+        LinearLayout containerRecentlyPlayed = (LinearLayout) scrollRecentlyPlayed.getChildAt(0);
+        if (containerRecentlyPlayed == null) {
+            Log.e(TAG, "Recently played container not found");
+            return;
+        }
+
+        // Load recently played tracks from SharedPreferences
+        SharedPreferences prefs = getContext().getSharedPreferences("MelodixPrefs", MODE_PRIVATE);
+        Gson gson = new Gson();
+        String json = prefs.getString("recentTracks", null);
+        List<Track> recentTracks = new ArrayList<>();
+
+        try {
+            if (json != null) {
+                Type type = new TypeToken<ArrayList<Track>>() {}.getType();
+                List<Track> loadedTracks = gson.fromJson(json, type);
+
+                if (loadedTracks != null) {
+                    recentTracks.addAll(loadedTracks);
+                    Log.d(TAG, "Loaded " + recentTracks.size() + " recently played tracks");
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error loading recently played tracks: " + e.getMessage(), e);
+        }
+
+        // Clear existing views
+        containerRecentlyPlayed.removeAllViews();
+
+        // Show or hide "No Recent Tracks" message
+        if (recentTracks.isEmpty()) {
+            // Add a text view to show "No recently played tracks"
+            TextView txtNoRecentlyPlayed = new TextView(getContext());
+            txtNoRecentlyPlayed.setText("No recently played tracks");
+            txtNoRecentlyPlayed.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
+            txtNoRecentlyPlayed.setPadding(16, 16, 16, 16);
+            containerRecentlyPlayed.addView(txtNoRecentlyPlayed);
+        } else {
+            // Populate with recently played tracks
+            LayoutInflater inflater = LayoutInflater.from(getContext());
+
+            for (Track track : recentTracks) {
+                // Inflate the card layout for a recently played track
+                View trackView = inflater.inflate(R.layout.item_recently_played, containerRecentlyPlayed, false);
+
+                // Find views
+                ImageView imgAlbum = trackView.findViewById(R.id.img_album);
+                TextView txtSongName = trackView.findViewById(R.id.txt_song_title);
+                TextView txtArtistName = trackView.findViewById(R.id.txt_artist);
+
+                // Set data
+                txtSongName.setText(track.getTitle());
+                if (track.getArtist() != null) {
+                    txtArtistName.setText(track.getArtist().getName());
+                }
+
+                // Load album art
+                if (track.getAlbum() != null && track.getAlbum().getCoverMedium() != null) {
+                    Glide.with(this)
+                            .load(track.getAlbum().getCoverMedium())
+                            .placeholder(R.drawable.ic_launcher_background)
+                            .into(imgAlbum);
+                }
+
+                // Set click listener
+                trackView.setOnClickListener(v -> onItemClick(track));
+
+                // Add to container
+                containerRecentlyPlayed.addView(trackView);
+
+                // Add layout parameters with margins
+                LinearLayout.LayoutParams params = (LinearLayout.LayoutParams) trackView.getLayoutParams();
+                params.width = getResources().getDimensionPixelSize(R.dimen.recently_played_item_width);
+                params.height = getResources().getDimensionPixelSize(R.dimen.recently_played_item_height);
+                params.setMarginEnd(16);
+                trackView.setLayoutParams(params);
+            }
+        }
+    }
+    /**
+     * Refreshes the recently played tracks section
+     * Called from MainActivity when returning to the HomeFragment
+     */
+    public void refreshRecentlyPlayed() {
+        // Simply reuse the existing setup method to refresh the data
+        setupRecentlyPlayed();
+    }
+
+    private void setupNewMusic() {
+        if (getContext() == null || getView() == null) return;
+
+        // Initialize RecyclerView for New Music tracks
+        recyclerNewMusic.setLayoutManager(new LinearLayoutManager(getContext(), LinearLayoutManager.HORIZONTAL, false));
+        newMusicAdapter = new NewMusicAdapter(this); // Fixed constructor call
+        recyclerNewMusic.setAdapter(newMusicAdapter);
+
+        // Show loading indicator
+        ProgressBar progressNewMusic = getView().findViewById(R.id.progress_circular); // Changed ID to match layout
+        if (progressNewMusic != null) {
+            progressNewMusic.setVisibility(View.VISIBLE);
+        }
+
+        // Fetch new releases or charts from Deezer API
+        repository.getLatestReleases(new DeezerRepository.DataCallback<List<Track>>() { // Changed method name to match repository
+            @Override
+            public void onSuccess(List<Track> data) {
+                if (getActivity() == null || !isAdded()) return;
+
+                getActivity().runOnUiThread(() -> {
+                    // Hide loading indicator
+                    if (progressNewMusic != null) {
+                        progressNewMusic.setVisibility(View.GONE);
+                    }
+
+                    if (data != null && !data.isEmpty()) {
+                        // Store context in tracks for later use
+                        for (Track track : data) {
+                            track.setContext(getContext());
+                        }
+
+                        // Update adapter with new data
+                        newMusicAdapter.updateData(data); // Changed from updateTracks to updateData
+                        Log.d(TAG, "Loaded " + data.size() + " new music tracks");
+
+                        // Create "No Music" message programmatically
+                        TextView txtNoNewMusic = new TextView(getContext());
+                        txtNoNewMusic.setText("No new music available");
+                        txtNoNewMusic.setId(View.generateViewId());
+
+                        txtNoNewMusic.setVisibility(View.GONE);
+                        recyclerNewMusic.setVisibility(View.VISIBLE);
+                    } else {
+                        // Show "No New Music" message programmatically
+                        TextView txtNoNewMusic = new TextView(getContext());
+                        txtNoNewMusic.setText("No new music available");
+                        ViewGroup container = getView().findViewById(R.id.container_new_music);
+                        if (container != null) {
+                            container.addView(txtNoNewMusic);
+                        }
+                        recyclerNewMusic.setVisibility(View.GONE);
+                    }
+                });
+            }
+
+            @Override
+            public void onError(String message) {
+                if (getActivity() == null || !isAdded()) return;
+
+                getActivity().runOnUiThread(() -> {
+                    // Hide loading indicator
+                    if (progressNewMusic != null) {
+                        progressNewMusic.setVisibility(View.GONE);
+                    }
+
+                    // Show error message programmatically
+                    TextView txtNoNewMusic = new TextView(getContext());
+                    txtNoNewMusic.setText("Error loading new music");
+                    ViewGroup container = getView().findViewById(R.id.container_new_music);
+                    if (container != null) {
+                        container.addView(txtNoNewMusic);
+                    }
+                    recyclerNewMusic.setVisibility(View.GONE);
+
+                    // Log error
+                    Log.e(TAG, "Error loading new music: " + message);
+                });
+            }
+        });
     }
 }
