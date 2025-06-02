@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Melodix</string>
+    <string name="welcome_message">Welcome, %1$s!</string>
+
+    <!-- Facebook Configuration -->
+    <string name="facebook_app_id">YOUR_FB_APP_ID</string>
+    <string name="fb_login_protocol_scheme">fbYOUR_FB_APP_ID</string>
+    <string name="facebook_client_token">YOUR_CLIENT_TOKEN</string>
+
+    <!-- API Messages -->
+    <string name="unknown_artist">Unknown Artist</string>
+
+    <!-- Playback Messages -->
+    <string name="playing_track">Now playing: %1$s</string>
+
+    <!-- User Information -->
+    <string name="username_example">John Doe</string>
+    <string name="email_example">john.doe@example.com</string>
+
+    <!-- Search Messages -->
+    <string name="no_results">No results found</string>
+    <string name="search_error">Search error</string>
+    <string name="enter_search_terms">Enter search terms</string>
+    <string name="results_found">Search Results (%1$d)</string>
+
+    <!-- TODO: Remove or change this placeholder text -->
+    <string name="hello_blank_fragment">Hello blank fragment</string>
+</resources>
+

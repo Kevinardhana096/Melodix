@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Light Theme Colors - More refined palette -->
+    <color name="light_background">#FAFAFA</color>
+    <color name="light_surface">#FFFFFF</color>
+    <color name="light_primary">#7C4DFF</color>
+    <color name="light_primary_variant">#5E35B1</color>
+    <color name="light_secondary">#00BFA5</color>
+    <color name="light_text_primary">#212121</color>
+    <color name="light_text_secondary">#757575</color>
+    <color name="light_card_background">#F5F5F5</color>
+    <color name="light_divider">#E0E0E0</color>
+
+    <!-- Dark Theme Colors - Softer, more pleasing dark theme -->
+    <color name="dark_background">#121212</color>
+    <color name="dark_surface">#1E1E1E</color>
+    <color name="dark_primary">#BB86FC</color>
+    <color name="dark_primary_variant">#7C4DFF</color>
+    <color name="dark_secondary">#03DAC5</color>
+    <color name="dark_text_primary">#FFFFFF</color>
+    <color name="dark_text_secondary">#B0B0B0</color>
+    <color name="dark_card_background">#2D2D2D</color>
+    <color name="dark_divider">#3D3D3D</color>
+
+    <!-- Common Colors -->
+    <color name="black">#000000</color>
+    <color name="white">#FFFFFF</color>
+    <color name="gray">#757575</color>
+    <color name="facebook_blue">#1877F2</color>
+    <color name="light_gray">#AAAAAA</color>
+
+    <!-- Accent Colors -->
+    <color name="success">#4CAF50</color>
+    <color name="warning">#FFC107</color>
+    <color name="error">#F44336</color>
+    <color name="info">#2196F3</color>
+
+    <!-- Legacy Colors - keeping for backward compatibility -->
+    <color name="input_background">#1E1E1E</color>
+    <color name="purple_200">#BB86FC</color>
+    <color name="purple_500">#7C4DFF</color>
+    <color name="purple_700">#5E35B1</color>
+    <color name="teal_200">#03DAC5</color>
+    <color name="teal_700">#018786</color>
+
+    <!-- Bottom navigation colors -->
+    <color name="selected">#7C4DFF</color>
+    <color name="unselected">#9E9E9E</color>
+</resources>
+
