@@ -1,198 +1,240 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?android:colorBackground"
-    android:fillViewport="true"
-    tools:context=".ProfileActivity">
+    android:background="?attr/colorSurface"
+    tools:context=".activity.ProfileActivity">
 
-    <LinearLayout
-        android:layout_width="match_parent"
+    <ProgressBar
+        android:id="@+id/progress_bar_upload"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="16dp">
+        android:layout_centerInParent="true"
+        android:visibility="gone" />
 
-        <!-- Header with back button and title -->
-        <RelativeLayout
+    <!-- App Bar with curved bottom edge -->
+    <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/appbar"
+        android:layout_width="match_parent"
+        android:layout_height="220dp"
+        android:background="?attr/colorOnPrimary"
+        android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar">
+
+        <com.google.android.material.appbar.CollapsingToolbarLayout
+            android:id="@+id/collapsing_toolbar"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="32dp">
+            android:layout_height="match_parent"
+            app:contentScrim="?attr/colorOnPrimary"
+            app:expandedTitleMarginEnd="64dp"
+            app:expandedTitleMarginStart="48dp"
+            app:layout_scrollFlags="scroll|exitUntilCollapsed">
 
-            <ImageView
-                android:id="@+id/btn_back"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:layout_alignParentStart="true"
-                android:layout_centerVertical="true"
-                android:src="@drawable/ic_back"
-                app:tint="?android:attr/textColorPrimary" />
+            <!-- Back button -->
+            <androidx.appcompat.widget.Toolbar
+                android:id="@+id/toolbar"
+                android:layout_width="match_parent"
+                android:layout_height="?attr/actionBarSize"
+                app:layout_collapseMode="pin">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_centerInParent="true"
-                android:text="Edit Profile"
-                android:textColor="?android:attr/textColorPrimary"
-                android:textSize="18sp"
-                android:textStyle="bold" />
+                <ImageView
+                    android:id="@+id/img_back"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:padding="12dp"
+                    android:src="@drawable/ic_back"
+                    app:tint="?android:attr/textColorPrimary" />
 
-        </RelativeLayout>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="24dp"
+                    android:text="Profile"
+                    android:textColor="?android:attr/textColorPrimary"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
 
-        <!-- Profile Picture -->
+            </androidx.appcompat.widget.Toolbar>
+
+            <!-- Profile image and basic info centered in the app bar -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:paddingBottom="24dp">
+
+                <de.hdodenhof.circleimageview.CircleImageView
+                    android:id="@+id/profile_image_large"
+                    android:layout_width="100dp"
+                    android:layout_height="100dp"
+                    android:layout_marginTop="36dp"
+                    android:src="@drawable/ic_launcher_background"
+                    app:civ_border_color="@android:color/white"
+                    app:civ_border_width="3dp" />
+
+                <TextView
+                    android:id="@+id/tv_upload_profile_picture"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="Change Profile Picture"
+                    android:textColor="?android:attr/textColorPrimary"
+                    android:textAlignment="center"
+                    android:textSize="14sp"
+                    android:textStyle="bold"/>
+            </LinearLayout>
+        </com.google.android.material.appbar.CollapsingToolbarLayout>
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <!-- Content area with profile editing form -->
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:overScrollMode="never"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:gravity="center"
             android:orientation="vertical"
-            android:layout_marginBottom="32dp">
+            android:paddingHorizontal="24dp"
+            android:paddingTop="16dp"
+            android:paddingBottom="24dp">
 
-            <de.hdodenhof.circleimageview.CircleImageView
-                android:id="@+id/img_profile"
-                android:layout_width="100dp"
-                android:layout_height="100dp"
-                android:layout_marginBottom="16dp"
-                android:src="@drawable/ic_launcher_background"
-                app:civ_border_color="?android:attr/textColorPrimary"
-                app:civ_border_width="2dp" />
-
+            <!-- Edit Profile Title -->
             <TextView
-                android:id="@+id/tv_name"
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="kevinardana12"
+                android:layout_marginBottom="16dp"
+                android:text="Edit Profile"
                 android:textColor="?android:attr/textColorPrimary"
                 android:textSize="20sp"
                 android:textStyle="bold" />
 
-        </LinearLayout>
-
-        <!-- Username Field -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:layout_marginBottom="20dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Username"
-                android:textColor="?android:attr/textColorPrimary"
-                android:textSize="14sp"
-                android:layout_marginBottom="8dp" />
-
-            <EditText
-                android:id="@+id/et_username"
+            <!-- Username Input -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/username_input_layout"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                 android:layout_width="match_parent"
-                android:layout_height="50dp"
-                android:background="@drawable/edittext_background"
-                android:text="yANCHUI"
-                android:textColor="?android:attr/textColorPrimary"
-                android:textColorHint="?android:attr/textColorSecondary"
-                android:paddingStart="16dp"
-                android:paddingEnd="16dp"
-                android:singleLine="true" />
-
-        </LinearLayout>
-
-        <!-- Email Field -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:layout_marginBottom="20dp">
-
-            <TextView
-                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Email"
-                android:textColor="?android:attr/textColorPrimary"
-                android:textSize="14sp"
-                android:layout_marginBottom="8dp" />
+                android:layout_marginBottom="16dp"
+                android:hint="Username"
+                app:startIconDrawable="@android:drawable/ic_menu_myplaces"
+                app:startIconTint="?attr/colorPrimary">
 
-            <EditText
-                android:id="@+id/et_email"
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/username_edit"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="textPersonName"
+                    android:paddingStart="48dp" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- Email Input -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/email_input_layout"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                 android:layout_width="match_parent"
-                android:layout_height="50dp"
-                android:background="@drawable/edittext_background"
-                android:text="yanchui@gmail.com"
-                android:textColor="?android:attr/textColorPrimary"
-                android:textColorHint="?android:attr/textColorSecondary"
-                android:paddingStart="16dp"
-                android:paddingEnd="16dp"
-                android:singleLine="true"
-                android:inputType="textEmailAddress" />
-
-        </LinearLayout>
-
-        <!-- Password Field -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:layout_marginBottom="32dp">
-
-            <TextView
-                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Password"
-                android:textColor="?android:attr/textColorPrimary"
-                android:textSize="14sp"
-                android:layout_marginBottom="8dp" />
+                android:layout_marginBottom="16dp"
+                android:hint="Email"
+                app:startIconDrawable="@android:drawable/ic_dialog_email"
+                app:startIconTint="?attr/colorPrimary">
 
-            <EditText
-                android:id="@+id/et_password"
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/email_edit"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="textEmailAddress"
+                    android:paddingStart="48dp" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- Current Password Input -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/current_password_input_layout"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                 android:layout_width="match_parent"
-                android:layout_height="50dp"
-                android:background="@drawable/edittext_background"
-                android:text="evFTbyVVCd"
-                android:textColor="?android:attr/textColorPrimary"
-                android:textColorHint="?android:attr/textColorSecondary"
-                android:paddingStart="16dp"
-                android:paddingEnd="16dp"
-                android:singleLine="true"
-                android:inputType="textPassword" />
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:hint="Current Password"
+                app:endIconMode="password_toggle"
+                app:startIconDrawable="@android:drawable/ic_lock_idle_lock"
+                app:startIconTint="?attr/colorPrimary">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/current_password_edit"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="textPassword"
+                    android:paddingStart="48dp" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- New Password Input -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/new_password_input_layout"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:hint="New Password (optional)"
+                app:endIconMode="password_toggle"
+                app:startIconDrawable="@android:drawable/ic_lock_lock"
+                app:startIconTint="?attr/colorPrimary">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/new_password_edit"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="textPassword"
+                    android:paddingStart="48dp" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- Save Button -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_save_profile"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="16dp"
+                android:text="Save Changes"
+                android:textAllCaps="false"
+                android:textColor="@android:color/white"
+                android:textSize="16sp"
+                app:backgroundTint="?attr/colorPrimary"
+                app:cornerRadius="12dp"
+                app:elevation="2dp"
+                app:icon="@android:drawable/ic_menu_save"
+                app:iconGravity="textStart"
+                app:iconPadding="8dp"
+                app:iconTint="@android:color/white" />
+
+            <!-- Divider -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="24dp"
+                android:layout_marginBottom="24dp"
+                android:background="?android:attr/listDivider" />
+
+            <!-- Logout Button -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_logout"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:text="Logout"
+                android:textAllCaps="false"
+                android:textColor="@android:color/white"
+                android:textSize="16sp"
+                app:backgroundTint="@color/design_default_color_error"
+                app:cornerRadius="12dp"
+                app:elevation="2dp"
+                app:icon="@android:drawable/ic_lock_power_off"
+                app:iconGravity="textStart"
+                app:iconPadding="8dp"
+                app:iconTint="@android:color/white"
+                app:rippleColor="#80FFFFFF" />
 
         </LinearLayout>
-
-        <!-- Update Button -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_update"
-            android:layout_width="match_parent"
-            android:layout_height="50dp"
-            app:cornerRadius="25dp"
-            android:backgroundTint="?attr/colorSecondary"
-            android:text="Update"
-            android:textColor="?attr/colorOnSecondary"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="16dp" />
-
-        <!-- Logout Button -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_logout"
-            android:layout_width="match_parent"
-            android:layout_height="50dp"
-            android:backgroundTint="@android:color/holo_red_dark"
-            app:cornerRadius="25dp"
-            android:text="Logout"
-            android:textColor="@android:color/white"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="24dp" />
-
-        <!-- Join Date -->
-        <TextView
-            android:id="@+id/tv_join_date"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:text="Joined 28 Jan 2021"
-            android:textColor="?android:attr/textColorSecondary"
-            android:textSize="14sp" />
-
-    </LinearLayout>
-
-</ScrollView>
+    </androidx.core.widget.NestedScrollView>
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

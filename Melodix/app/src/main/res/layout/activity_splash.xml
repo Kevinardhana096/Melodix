@@ -5,8 +5,8 @@
     android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".SplashActivity"
-    android:background="?android:colorBackground">
+    tools:context=".activity.SplashActivity"
+    android:background="?attr/colorSurface">
 
     <ImageView
         android:id="@+id/logo"

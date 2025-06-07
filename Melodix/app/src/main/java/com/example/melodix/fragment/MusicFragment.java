@@ -1,8 +1,5 @@
 package com.example.melodix.fragment;
 
-import static android.content.Context.MODE_PRIVATE;
-
-import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -21,38 +18,37 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import com.bumptech.glide.Glide;
-import com.example.melodix.DeezerRepository;
-import com.example.melodix.MainActivity;
-import com.example.melodix.MusicPlayer;
+import com.example.melodix.api.DeezerRepository;
+import com.example.melodix.activity.MainActivity;
+import com.example.melodix.listener.MusicPlayer;
 import com.example.melodix.R;
-import com.example.melodix.Track;
-import com.example.melodix.TrackChangeListener;
+import com.example.melodix.database.DownloadedMusicDbHelper;
+import com.example.melodix.database.DownloadedTrack;
+import com.example.melodix.listener.MusicDownloader;
+import com.example.melodix.model.Track;
+import com.example.melodix.listener.TrackChangeListener;
+import com.example.melodix.listener.UserPreferencesManager;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
-import com.google.common.reflect.TypeToken;
-import com.google.gson.Gson;
 
-import java.lang.reflect.Type;
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
 public class MusicFragment extends Fragment implements TrackChangeListener {
     private static final String TAG = "MusicFragment";
-
-    // UI elements
     private ImageView imgAlbumArt;
-    private TextView tvTrackTitle, tvArtistName, tvCurrentTime, tvTotalTime, tvSongTitle;
+    private TextView tvTrackTitle, tvArtistName, tvCurrentTime, tvTotalTime;
     private SeekBar seekBarProgress;
     private FloatingActionButton btnPlayPause;
     private ImageButton btnPrevious, btnNext;
-    private ImageButton btnFavoriteTop; // Add favorite button
+    private ImageButton btnFavoriteTop;
+    private ImageButton btnDownload;
     private MusicPlayer musicPlayer;
     private Track currentTrack;
     private Handler uiUpdateHandler;
     private boolean isUiUpdateActive = false;
-
-    // Constants for SharedPreferences
-    private static final String PREFS_NAME = "MelodixPrefs";
-    private static final String FAVORITES_KEY = "favorites";
+    private static final int PREVIEW_DURATION_SECONDS = 30;
+    private static final int PREVIEW_DURATION_MS = PREVIEW_DURATION_SECONDS * 1000;
 
     @Nullable
     @Override
@@ -66,59 +62,50 @@ public class MusicFragment extends Fragment implements TrackChangeListener {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        // Get the music player instance
         musicPlayer = MusicPlayer.getInstance();
         uiUpdateHandler = new Handler(Looper.getMainLooper());
 
-        // Set initial button state based on player state
         updatePlayPauseButton(musicPlayer.isPlaying());
 
-        // Set up listeners for playback controls
         btnPlayPause.setOnClickListener(v -> togglePlayback());
         btnNext.setOnClickListener(v -> skipToNextTrack());
         btnPrevious.setOnClickListener(v -> skipToPreviousTrack());
 
-        // Set up favorite button listener
         btnFavoriteTop.setOnClickListener(v -> toggleFavoriteStatus());
 
-        // Set up seek bar listener for manual seeking
+        btnDownload.setOnClickListener(v -> downloadTrack());
+
         seekBarProgress.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 if (fromUser) {
-                    musicPlayer.seekTo(progress);
+                    int limitedProgress = Math.min(progress, PREVIEW_DURATION_MS);
+                    musicPlayer.seekTo(limitedProgress);
+
+                    Log.d(TAG, "User seeked to: " + limitedProgress + "ms");
                 }
             }
 
             @Override
             public void onStartTrackingTouch(SeekBar seekBar) {
-                // Stop UI updates during manual seeking
                 stopUiUpdates();
             }
 
             @Override
             public void onStopTrackingTouch(SeekBar seekBar) {
-                // Resume UI updates after manual seeking
                 startUiUpdates();
             }
         });
-
-        // Register this fragment to receive track change events
         if (getActivity() instanceof MainActivity) {
             ((MainActivity) getActivity()).addTrackChangeListener(this);
         }
-
-        // Set up the music player listener
         setupMusicPlayerListener();
-
-        // If there's a track already loaded in the player, update the UI
         Track track = musicPlayer.getCurrentTrack();
         if (track != null) {
             updateTrackUI(track);
-            currentTrack = track; // Make sure current track is set
-            startUiUpdates(); // Start updating UI for ongoing playback
+            currentTrack = track;
+            startUiUpdates();
         } else {
-            // No track in player, try to load the last played track from SharedPreferences
             loadLastPlayedTrack();
         }
     }
@@ -133,31 +120,33 @@ public class MusicFragment extends Fragment implements TrackChangeListener {
         btnPlayPause = view.findViewById(R.id.btnPlayPause);
         btnPrevious = view.findViewById(R.id.btnPrevious);
         btnNext = view.findViewById(R.id.btnNext);
-        tvSongTitle = view.findViewById(R.id.tvSongTitle);
-        btnFavoriteTop = view.findViewById(R.id.btnFavoriteTop); // Initialize favorite button
+        btnFavoriteTop = view.findViewById(R.id.btnFavoriteTop);
+        btnDownload = view.findViewById(R.id.btnDownload);
     }
 
     private void loadLastPlayedTrack() {
-        SharedPreferences prefs = requireActivity().getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        String json = prefs.getString("recentTracks", null);
-
-        if (json != null) {
-            Gson gson = new Gson();
-            Type type = new TypeToken<ArrayList<Track>>() {}.getType();
-            List<Track> recentTracks = gson.fromJson(json, type);
-
-            if (recentTracks != null && !recentTracks.isEmpty()) {
-                // Get the most recently played track (first in the list)
-                Track lastTrack = recentTracks.get(0);
-
-                // Update the UI with this track
-                currentTrack = lastTrack;
-                updateTrackUI(lastTrack);
-
-                // Don't automatically start playback, just show the track info
-                Log.d(TAG, "Loaded last played track: " + lastTrack.getTitle());
+        UserPreferencesManager.getRecentTracksAsync(requireContext(), new UserPreferencesManager.DataCallback<List<Track>>() {
+            @Override
+            public void onSuccess(List<Track> recentTracks) {
+                if (recentTracks != null && !recentTracks.isEmpty()) {
+                    Track lastTrack = recentTracks.get(0);
+                    currentTrack = lastTrack;
+                    updateTrackUI(lastTrack);
+                    Log.d(TAG, "Loaded last played track: " + lastTrack.getTitle());
+                }
             }
-        }
+            @Override
+            public void onError(String error) {
+                Log.e(TAG, "Error loading recent tracks: " + error);
+                List<Track> localRecent = UserPreferencesManager.getRecentTracks(requireContext());
+                if (localRecent != null && !localRecent.isEmpty()) {
+                    Track lastTrack = localRecent.get(0);
+                    currentTrack = lastTrack;
+                    updateTrackUI(lastTrack);
+                    Log.d(TAG, "Loaded last played track from local: " + lastTrack.getTitle());
+                }
+            }
+        });
     }
 
     private void setupMusicPlayerListener() {
@@ -171,7 +160,6 @@ public class MusicFragment extends Fragment implements TrackChangeListener {
                     });
                 }
             }
-
             @Override
             public void onPlaybackPaused() {
                 if (isAdded() && btnPlayPause != null) {
@@ -181,7 +169,6 @@ public class MusicFragment extends Fragment implements TrackChangeListener {
                     });
                 }
             }
-
             @Override
             public void onPlaybackStopped() {
                 if (isAdded() && btnPlayPause != null) {
@@ -191,7 +178,6 @@ public class MusicFragment extends Fragment implements TrackChangeListener {
                     });
                 }
             }
-
             @Override
             public void onPlaybackCompleted() {
                 if (isAdded() && btnPlayPause != null) {
@@ -201,42 +187,40 @@ public class MusicFragment extends Fragment implements TrackChangeListener {
                     });
                 }
             }
-
             @Override
             public void onDurationChanged(int duration) {
                 if (isAdded() && seekBarProgress != null) {
                     requireActivity().runOnUiThread(() -> {
-                        seekBarProgress.setMax(duration);
-                        int minutes = duration / 60000;
-                        int seconds = (duration % 60000) / 1000;
+                        int previewDurationMs = PREVIEW_DURATION_MS;
+                        seekBarProgress.setMax(previewDurationMs);
+                        int minutes = previewDurationMs / 60000;
+                        int seconds = (previewDurationMs % 60000) / 1000;
                         tvTotalTime.setText(String.format("%d:%02d", minutes, seconds));
+
+                        Log.d(TAG, "Duration changed - Using preview duration: " + previewDurationMs + "ms instead of reported: " + duration + "ms");
                     });
                 }
             }
-
             @Override
             public void onPositionChanged(int position) {
                 if (isAdded() && seekBarProgress != null) {
                     requireActivity().runOnUiThread(() -> {
-                        seekBarProgress.setProgress(position);
-                        int minutes = position / 60000;
-                        int seconds = (position % 60000) / 1000;
-                        tvCurrentTime.setText(String.format("%d:%02d", minutes, seconds));
+                        int limitedPosition = Math.min(position, PREVIEW_DURATION_MS);
+                        seekBarProgress.setProgress(limitedPosition);
+                        tvCurrentTime.setText(formatTime(limitedPosition));
+
+                        Log.d(TAG, "Position updated: " + limitedPosition + "ms / " + PREVIEW_DURATION_MS + "ms");
                     });
                 }
             }
 
             @Override
             public void onPrepareStart() {
-                if (isAdded()) {
-                    requireActivity().runOnUiThread(() ->
-                        Toast.makeText(getContext(), "Loading track...", Toast.LENGTH_SHORT).show());
-                }
+
             }
 
             @Override
             public void onPrepareComplete() {
-                // Ready to play
                 if (isAdded()) {
                     requireActivity().runOnUiThread(() ->
                         updatePlayPauseButton(true));
@@ -255,11 +239,15 @@ public class MusicFragment extends Fragment implements TrackChangeListener {
 
             @Override
             public void onTrackChanged(Track newTrack) {
-                // This is crucial for updating UI when tracks are changed via next/previous buttons
                 if (isAdded() && newTrack != null) {
-                    Log.d(TAG, "onTrackChanged callback: " + newTrack.getTitle());
+                    Log.d(TAG, "onTrackChanged callback received for: " + newTrack.getTitle());
                     requireActivity().runOnUiThread(() -> {
+                        currentTrack = newTrack;
                         updateTrackUI(newTrack);
+                        updateFavoriteButtonState(newTrack);
+                        if (getActivity() instanceof MainActivity) {
+                            ((MainActivity) getActivity()).addToRecentlyPlayed(newTrack);
+                        }
                     });
                 }
             }
@@ -268,17 +256,12 @@ public class MusicFragment extends Fragment implements TrackChangeListener {
 
     private void updateTrackUI(Track track) {
         if (track == null || !isAdded()) return;
-
         currentTrack = track;
-
-        // Update track information
         tvTrackTitle.setText(track.getTitle());
-        tvSongTitle.setText(track.getTitle());
         if (track.getArtist() != null) {
             tvArtistName.setText(track.getArtist().getName());
         }
 
-        // Load album art
         if (track.getAlbum() != null && track.getAlbum().getCoverMedium() != null) {
             Glide.with(this)
                     .load(track.getAlbum().getCoverMedium())
@@ -287,22 +270,44 @@ public class MusicFragment extends Fragment implements TrackChangeListener {
         } else {
             imgAlbumArt.setImageResource(R.drawable.ic_launcher_background);
         }
-
-        // Reset the seekbar if track has changed
+        String titleText = track.getTitle();
+        if (!track.isDownloaded()) {
+            titleText += " (Preview)";
+        }
+        tvTrackTitle.setText(titleText);
         seekBarProgress.setProgress(0);
         tvCurrentTime.setText("0:00");
 
-        // Set total duration if available
-        if (track.getDuration() > 0) {
-            int minutes = track.getDuration() / 60;
-            int seconds = track.getDuration() % 60;
-            tvTotalTime.setText(String.format("%d:%02d", minutes, seconds));
-        } else {
-            tvTotalTime.setText("0:00");
-        }
+        int displayDuration = getDisplayDuration(track);
+        int minutes = displayDuration / 60;
+        int seconds = displayDuration % 60;
+        tvTotalTime.setText(String.format("%d:%02d", minutes, seconds));
 
-        // Update favorite button state
         updateFavoriteButtonState(track);
+        updateDownloadButtonState();
+    }
+    private int getDisplayDuration(Track track) {
+        if (track == null) return 0;
+
+        if (track.isDownloaded() && track.getPreviewUrl() != null) {
+            File localFile = new File(track.getPreviewUrl());
+            if (localFile.exists()) {
+                Log.d(TAG, "Track is downloaded, using preview duration: " + PREVIEW_DURATION_SECONDS + "s");
+                return PREVIEW_DURATION_SECONDS;
+            }
+        }
+        if (track.getPreviewUrl() != null && track.getPreviewUrl().contains("dzcdn.net")) {
+            Log.d(TAG, "Track is streaming preview, using preview duration: " + PREVIEW_DURATION_SECONDS + "s");
+            return PREVIEW_DURATION_SECONDS;
+        }
+        if (track.getDuration() > 0) {
+            if (track.getDuration() > PREVIEW_DURATION_SECONDS) {
+                Log.d(TAG, "Track duration (" + track.getDuration() + "s) is longer than preview, using preview duration");
+                return PREVIEW_DURATION_SECONDS;
+            }
+            return track.getDuration();
+        }
+        return PREVIEW_DURATION_SECONDS;
     }
 
     private void togglePlayback() {
@@ -321,64 +326,141 @@ public class MusicFragment extends Fragment implements TrackChangeListener {
         } else {
             if (musicPlayer.getCurrentTrack() != null &&
                 musicPlayer.getCurrentTrack().getId() == currentTrack.getId()) {
-                // Resume the current track
                 musicPlayer.play();
                 updatePlayPauseButton(true);
                 startUiUpdates();
             } else {
-                // Load and play the selected track
                 musicPlayer.prepareFromUrl(requireContext(), currentTrack);
                 updatePlayPauseButton(true);
-                // UI updates will start from onPlaybackStarted callback
             }
         }
+    }
+    private String formatTime(int timeMs) {
+        int minutes = timeMs / 60000;
+        int seconds = (timeMs % 60000) / 1000;
+        return String.format("%d:%02d", minutes, seconds);
     }
 
     private void skipToNextTrack() {
-        if (musicPlayer.hasNextTrack()) {
-            boolean success = musicPlayer.playNextTrack();
-            if (success) {
-                // UI will be updated via onTrackChanged callback
-                Log.d(TAG, "Playing next track");
-            } else {
-                Log.d(TAG, "Failed to play next track");
-                Toast.makeText(getContext(), "Could not play next track", Toast.LENGTH_SHORT).show();
+        MainActivity mainActivity = (MainActivity) getActivity();
+        if (mainActivity == null) return;
+
+        if (currentTrack != null && currentTrack.isDownloaded()) {
+            mainActivity.setPlayingFromDownloaded(true);
+            Track nextDownloadedTrack = mainActivity.getNextDownloadedTrack();
+
+            if (nextDownloadedTrack != null) {
+                mainActivity.playTrack(nextDownloadedTrack);
+                return;
+            }
+        }
+
+        if (musicPlayer.getPlaylist().isEmpty() || musicPlayer.getPlaylist().size() < 5) {
+            Log.d(TAG, "Playlist is small or empty, loading more tracks...");
+            loadMoreTracksToPlaylist(true);
+            return;
+        }
+
+        boolean success = musicPlayer.playRandomTrack();
+        if (success) {
+            Log.d(TAG, "Playing random track from playlist");
+            Track newTrack = musicPlayer.getCurrentTrack();
+            if (newTrack != null) {
+                currentTrack = newTrack;
+                requireActivity().runOnUiThread(() -> {
+                    updateTrackUI(newTrack);
+                    updateFavoriteButtonState(newTrack);
+                });
+
+                if (mainActivity != null) {
+                    mainActivity.addToRecentlyPlayed(newTrack);
+                }
             }
         } else {
-            // Instead of showing "No next track available", fetch and play a random track
-            Log.d(TAG, "No next track in queue, playing a random track instead");
-            Toast.makeText(getContext(), "Playing a random track...", Toast.LENGTH_SHORT).show();
-            playRandomTrack();
+            Log.d(TAG, "Failed to play random track, loading more tracks...");
+            loadMoreTracksToPlaylist(true);
         }
     }
-    private void playRandomTrack() {
-        // Get repository instance
+    private void loadMoreTracksToPlaylist(boolean playNext) {
         DeezerRepository repository = DeezerRepository.getInstance();
+        String[] searchQueries = {
+                "pop music", "rock music", "jazz music", "electronic music",
+                "indie music", "alternative", "classical", "hip hop",
+                "latin music", "world music", "blues", "country music"
+        };
+        String randomQuery = searchQueries[(int) (Math.random() * searchQueries.length)];
+        Log.d(TAG, "Loading tracks with query: " + randomQuery);
+        repository.searchTracks(randomQuery, new DeezerRepository.DataCallback<List<Track>>() {
+            @Override
+            public void onSuccess(List<Track> tracks) {
+                if (tracks != null && !tracks.isEmpty()) {
+                    for (Track track : tracks) {
+                        if (getContext() != null) {
+                            track.setContext(getContext());
+                        }
+                    }
+                    List<Track> shuffledTracks = new ArrayList<>(tracks);
+                    java.util.Collections.shuffle(shuffledTracks);
 
-        // Fetch top tracks which we can use as a source for random selection
+                    List<Track> currentPlaylist = musicPlayer.getPlaylist();
+                    shuffledTracks.addAll(0, currentPlaylist);
+
+                    musicPlayer.setPlaylist(requireContext(), shuffledTracks, 0);
+
+                    if (playNext && isAdded()) {
+                        requireActivity().runOnUiThread(() -> {
+                            boolean success = musicPlayer.playRandomTrack();
+                            if (!success && !shuffledTracks.isEmpty()) {
+                                musicPlayer.prepareFromUrl(requireContext(), shuffledTracks.get(0));
+                            }
+                        });
+                    }
+                } else {
+                    loadTracksFromChart(playNext);
+                }
+            }
+            @Override
+            public void onError(String message) {
+                Log.e(TAG, "Error loading tracks: " + message);
+                if (isAdded()) {
+                    requireActivity().runOnUiThread(() -> {
+                        loadTracksFromChart(playNext);
+                    });
+                }
+            }
+        });
+    }
+    private void loadTracksFromChart(boolean playNext) {
+        DeezerRepository repository = DeezerRepository.getInstance();
         repository.getTopTracks(new DeezerRepository.DataCallback<List<Track>>() {
             @Override
             public void onSuccess(List<Track> tracks) {
                 if (tracks != null && !tracks.isEmpty()) {
-                    // Get a random index
-                    int randomIndex = (int) (Math.random() * tracks.size());
-                    Track randomTrack = tracks.get(randomIndex);
-
-                    // Set context on the track
-                    if (getContext() != null) {
-                        randomTrack.setContext(getContext());
+                    for (Track track : tracks) {
+                        if (getContext() != null) {
+                            track.setContext(getContext());
+                        }
                     }
 
-                    // Play the random track
-                    if (isAdded()) {
+                    List<Track> shuffledTracks = new ArrayList<>(tracks);
+                    java.util.Collections.shuffle(shuffledTracks);
+                    List<Track> currentPlaylist = musicPlayer.getPlaylist();
+                    shuffledTracks.addAll(0, currentPlaylist);
+
+                    musicPlayer.setPlaylist(requireContext(), shuffledTracks, 0);
+
+                    if (playNext && isAdded()) {
                         requireActivity().runOnUiThread(() -> {
-                            musicPlayer.prepareFromUrl(requireContext(), randomTrack);
+                            boolean success = musicPlayer.playRandomTrack();
+                            if (!success && !shuffledTracks.isEmpty()) {
+                                musicPlayer.prepareFromUrl(requireContext(), shuffledTracks.get(0));
+                            }
                         });
                     }
                 } else {
                     if (isAdded()) {
                         requireActivity().runOnUiThread(() -> {
-                            Toast.makeText(getContext(), "No tracks available to play", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(getContext(), "No more tracks available", Toast.LENGTH_SHORT).show();
                         });
                     }
                 }
@@ -388,137 +470,262 @@ public class MusicFragment extends Fragment implements TrackChangeListener {
             public void onError(String message) {
                 if (isAdded()) {
                     requireActivity().runOnUiThread(() -> {
-                        Toast.makeText(getContext(), "Error fetching random track: " + message, Toast.LENGTH_SHORT).show();
+                        Toast.makeText(getContext(), "Error loading tracks: " + message, Toast.LENGTH_SHORT).show();
                     });
                 }
             }
         });
     }
 
-
     private void skipToPreviousTrack() {
+        MainActivity mainActivity = (MainActivity) getActivity();
+        if (mainActivity == null) return;
+
+        if (currentTrack != null && currentTrack.isDownloaded()) {
+            mainActivity.setPlayingFromDownloaded(true);
+            Track previousDownloadedTrack = mainActivity.getPreviousDownloadedTrack();
+
+            if (previousDownloadedTrack != null) {
+                mainActivity.playTrack(previousDownloadedTrack);
+                return;
+            }
+        }
         boolean success = musicPlayer.playPreviousTrack();
         if (success) {
-            // If success is true but there was no previous track, it means the current track was restarted
             if (!musicPlayer.hasPreviousTrack()) {
                 Log.d(TAG, "Restarting current track");
                 Toast.makeText(getContext(), "Restarting track", Toast.LENGTH_SHORT).show();
             } else {
                 Log.d(TAG, "Playing previous track");
+                Track newTrack = musicPlayer.getCurrentTrack();
+                if (newTrack != null) {
+                    currentTrack = newTrack;
+                    requireActivity().runOnUiThread(() -> {
+                        updateTrackUI(newTrack);
+                        updateFavoriteButtonState(newTrack);
+                    });
+                    if (mainActivity != null) {
+                        mainActivity.addToRecentlyPlayed(newTrack);
+                    }
+                }
             }
-            // UI will be updated via onTrackChanged callback
         } else {
             Log.d(TAG, "No previous track available");
             Toast.makeText(getContext(), "No previous track available", Toast.LENGTH_SHORT).show();
         }
     }
-
     private void toggleFavoriteStatus() {
         if (currentTrack == null) return;
+        final Track trackToToggle = currentTrack;
 
-        List<Track> favorites = getFavoriteTracks();
-        boolean isCurrentlyFavorite = false;
+        UserPreferencesManager.getFavoriteTracksAsync(requireContext(), new UserPreferencesManager.DataCallback<List<Track>>() {
+            @Override
+            public void onSuccess(List<Track> favorites) {
+                List<Track> mutableFavorites = new ArrayList<>(favorites);
+                boolean isCurrentlyFavorite = false;
+                for (Track favorite : mutableFavorites) {
+                    if (favorite.getId() == trackToToggle.getId()) {
+                        isCurrentlyFavorite = true;
+                        break;
+                    }
+                }
+                final boolean wasFavorite = isCurrentlyFavorite;
+                if (wasFavorite) {
+                    mutableFavorites.removeIf(track -> track.getId() == trackToToggle.getId());
+                    UserPreferencesManager.saveFavoriteTracksAsync(requireContext(), mutableFavorites, new UserPreferencesManager.DataCallback<Boolean>() {
+                        @Override
+                        public void onSuccess(Boolean success) {
+                            if (isAdded()) {
+                                requireActivity().runOnUiThread(() -> {
+                                    Toast.makeText(getContext(), "Removed from favorites", Toast.LENGTH_SHORT).show();
+                                    btnFavoriteTop.setImageResource(R.drawable.ic_favorite_filled);
+                                    if (getActivity() instanceof MainActivity) {
+                                        ((MainActivity) getActivity()).notifyFavoriteChanged();
+                                    }
+                                });
+                            }
+                        }
+                        @Override
+                        public void onError(String error) {
+                            if (isAdded()) {
+                                requireActivity().runOnUiThread(() -> {
+                                    Toast.makeText(getContext(), "Error removing from favorites", Toast.LENGTH_SHORT).show();
+                                    Log.e(TAG, "Error removing from favorites: " + error);
+                                });
+                            }
+                        }
+                    });
 
-        // Check if track is currently in favorites
-        for (Track favorite : favorites) {
-            if (favorite.getId() == currentTrack.getId()) {
-                isCurrentlyFavorite = true;
-                break;
+                } else {
+                    mutableFavorites.add(trackToToggle);
+                    UserPreferencesManager.saveFavoriteTracksAsync(requireContext(), mutableFavorites, new UserPreferencesManager.DataCallback<Boolean>() {
+                        @Override
+                        public void onSuccess(Boolean success) {
+                            if (isAdded()) {
+                                requireActivity().runOnUiThread(() -> {
+                                    Toast.makeText(getContext(), "Added to favorites", Toast.LENGTH_SHORT).show();
+                                    btnFavoriteTop.setImageResource(R.drawable.ic_favorite);
+                                    if (getActivity() instanceof MainActivity) {
+                                        ((MainActivity) getActivity()).notifyFavoriteChanged();
+                                    }
+                                });
+                            }
+                        }
+
+                        @Override
+                        public void onError(String error) {
+                            if (isAdded()) {
+                                requireActivity().runOnUiThread(() -> {
+                                    Toast.makeText(getContext(), "Error adding to favorites", Toast.LENGTH_SHORT).show();
+                                    Log.e(TAG, "Error adding to favorites: " + error);
+                                });
+                            }
+                        }
+                    });
+                }
             }
-        }
 
-        // Toggle favorite status
-        if (isCurrentlyFavorite) {
-            // Remove from favorites
-            favorites.removeIf(track -> track.getId() == currentTrack.getId());
-            Toast.makeText(getContext(), "Removed from favorites", Toast.LENGTH_SHORT).show();
-            btnFavoriteTop.setImageResource(R.drawable.ic_favorite_filled);
-        } else {
-            // Add to favorites
-            favorites.add(currentTrack);
-            Toast.makeText(getContext(), "Added to favorites", Toast.LENGTH_SHORT).show();
-            btnFavoriteTop.setImageResource(R.drawable.ic_favorite);
-        }
-
-        // Save updated favorites list
-        saveFavorites(favorites);
-
-        // Notify MainActivity that favorites have changed
-        if (getActivity() instanceof MainActivity) {
-            ((MainActivity) getActivity()).notifyFavoriteChanged();
-        }
+            @Override
+            public void onError(String error) {
+                if (isAdded()) {
+                    requireActivity().runOnUiThread(() -> {
+                        Toast.makeText(getContext(), "Error loading favorites", Toast.LENGTH_SHORT).show();
+                        Log.e(TAG, "Error loading favorites: " + error);
+                    });
+                }
+            }
+        });
     }
-
-    private List<Track> getFavoriteTracks() {
-        SharedPreferences prefs = requireActivity().getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        String json = prefs.getString(FAVORITES_KEY, null);
-
-        if (json == null) {
-            return new ArrayList<>();
-        }
-
-        Gson gson = new Gson();
-        Type type = new TypeToken<ArrayList<Track>>() {}.getType();
-        return gson.fromJson(json, type);
-    }
-
-    private void saveFavorites(List<Track> favorites) {
-        SharedPreferences prefs = requireActivity().getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        SharedPreferences.Editor editor = prefs.edit();
-
-        Gson gson = new Gson();
-        String json = gson.toJson(favorites);
-        editor.putString(FAVORITES_KEY, json);
-        editor.apply();
-    }
-
     private void updateFavoriteButtonState(Track track) {
         if (track == null || btnFavoriteTop == null) return;
+        final Track finalTrack = track;
 
-        List<Track> favorites = getFavoriteTracks();
-        boolean isFavorite = false;
+        UserPreferencesManager.getFavoriteTracksAsync(requireContext(), new UserPreferencesManager.DataCallback<List<Track>>() {
+            @Override
+            public void onSuccess(List<Track> favorites) {
+                boolean isFavorite = false;
 
-        for (Track favorite : favorites) {
-            if (favorite.getId() == track.getId()) {
-                isFavorite = true;
-                break;
+                for (Track favorite : favorites) {
+                    if (favorite.getId() == finalTrack.getId()) {
+                        isFavorite = true;
+                        break;
+                    }
+                }
+                final boolean trackIsFavorite = isFavorite;
+
+                if (isAdded()) {
+                    requireActivity().runOnUiThread(() -> {
+                        btnFavoriteTop.setImageResource(trackIsFavorite ?
+                                R.drawable.ic_favorite : R.drawable.ic_favorite_filled);
+                    });
+                }
             }
-        }
+            @Override
+            public void onError(String error) {
+                Log.e(TAG, "Error checking favorite status: " + error);
+                List<Track> localFavorites = UserPreferencesManager.getFavoriteTracks(requireContext());
+                boolean isFavorite = false;
+                for (Track favorite : localFavorites) {
+                    if (favorite.getId() == finalTrack.getId()) {
+                        isFavorite = true;
+                        break;
+                    }
+                }
+                final boolean trackIsFavorite = isFavorite;
 
-        btnFavoriteTop.setImageResource(isFavorite ?
-                R.drawable.ic_favorite : R.drawable.ic_favorite_filled);
+                if (isAdded()) {
+                    requireActivity().runOnUiThread(() -> {
+                        btnFavoriteTop.setImageResource(trackIsFavorite ?
+                                R.drawable.ic_favorite : R.drawable.ic_favorite_filled);
+                    });
+                }
+            }
+        });
     }
+    public void onTrackSelectedFromSearch(Track selectedTrack, List<Track> searchResults) {
+        Log.d(TAG, "Track selected from search: " + selectedTrack.getTitle());
 
+        if (searchResults != null && searchResults.size() > 1) {
+            int selectedIndex = -1;
+            for (int i = 0; i < searchResults.size(); i++) {
+                if (searchResults.get(i).getId() == selectedTrack.getId()) {
+                    selectedIndex = i;
+                    break;
+                }
+            }
+
+            for (Track track : searchResults) {
+                if (getContext() != null) {
+                    track.setContext(getContext());
+                }
+            }
+
+            List<Track> playlistTracks = new ArrayList<>(searchResults);
+            java.util.Collections.shuffle(playlistTracks);
+
+            if (selectedIndex >= 0) {
+                playlistTracks.remove(selectedTrack);
+                playlistTracks.add(0, selectedTrack);
+            }
+
+            musicPlayer.setPlaylist(requireContext(), playlistTracks, 0);
+            currentTrack = selectedTrack;
+            updateTrackUI(selectedTrack);
+
+            Log.d(TAG, "Loaded " + playlistTracks.size() + " tracks into playlist from search");
+            loadMoreTracksToPlaylist(false);
+
+        } else {
+            musicPlayer.prepareFromUrl(requireContext(), selectedTrack);
+            currentTrack = selectedTrack;
+            updateTrackUI(selectedTrack);
+
+            loadMoreTracksToPlaylist(false);
+        }
+    }
     @Override
     public void onTrackChanged(Track track) {
-        if (track == null || !isAdded()) return;
-
-        Log.d(TAG, "Track changed to: " + track.getTitle());
-
-        // Check if this is the same track that's already playing
-        boolean isSameTrack = false;
-        if (currentTrack != null && track.getId() == currentTrack.getId()) {
-            isSameTrack = true;
+        if (track == null || !isAdded()) {
+            Log.w(TAG, "onTrackChanged called with null track or fragment not added");
+            return;
         }
 
-        // Set the current track and update UI
+        Log.d(TAG, "=== TRACK CHANGED IN MUSIC FRAGMENT ===");
+        Log.d(TAG, "New track: " + track.getTitle());
+
         currentTrack = track;
-        updateTrackUI(track);
-
-        // Only prepare and start from beginning if it's a new track
-        if (!isSameTrack) {
-            musicPlayer.prepareFromUrl(requireContext(), track);
-            updatePlayPauseButton(true);
-        } else {
-            // For the same track, just update the UI to match current playback state
-            updatePlayPauseButton(musicPlayer.isPlaying());
-            if (musicPlayer.isPlaying()) {
-                startUiUpdates();
-            }
+        if (musicPlayer.getPlaylist().size() < 3) {
+            Log.d(TAG, "Playlist getting small, loading more tracks in background...");
+            loadMoreTracksToPlaylist(false);
         }
-    }
 
-    // Start regular UI updates for progress
+        requireActivity().runOnUiThread(() -> {
+            try {
+                updateTrackUI(track);
+
+                MusicPlayer musicPlayer = MusicPlayer.getInstance();
+                Track playerTrack = musicPlayer.getCurrentTrack();
+                if (playerTrack == null || playerTrack.getId() != track.getId()) {
+                    Log.d(TAG, "Track not loaded in player, preparing...");
+                    musicPlayer.prepareFromUrl(requireContext(), track);
+                }
+
+                boolean isPlaying = musicPlayer.isPlaying();
+                updatePlayPauseButton(isPlaying);
+
+                if (isPlaying) {
+                    startUiUpdates();
+                } else {
+                    stopUiUpdates();
+                }
+
+                Log.d(TAG, "✅ Track UI updated successfully");
+
+            } catch (Exception e) {
+                Log.e(TAG, "❌ Error updating track UI: " + e.getMessage(), e);
+            }
+        });
+    }
     private void startUiUpdates() {
         if (isUiUpdateActive) return;
 
@@ -528,17 +735,27 @@ public class MusicFragment extends Fragment implements TrackChangeListener {
             public void run() {
                 if (musicPlayer != null && musicPlayer.isPlaying() && isAdded()) {
                     int currentPosition = musicPlayer.getCurrentPosition();
+
+                    int maxPosition = PREVIEW_DURATION_MS;
+                    if (currentPosition > maxPosition) {
+                        currentPosition = maxPosition;
+                    }
+
                     if (seekBarProgress != null) {
                         seekBarProgress.setProgress(currentPosition);
                     }
                     if (tvCurrentTime != null) {
-                        int minutes = currentPosition / 60000;
-                        int seconds = (currentPosition % 60000) / 1000;
-                        tvCurrentTime.setText(String.format("%d:%02d", minutes, seconds));
+                        tvCurrentTime.setText(formatTime(currentPosition));
+                    }
+
+                    if (currentPosition >= maxPosition) {
+                        Log.d(TAG, "Preview completed, stopping playback");
+                        musicPlayer.pause();
+                        updatePlayPauseButton(false);
+                        stopUiUpdates();
+                        return;
                     }
                 }
-
-                // Continue if still active and fragment is visible
                 if (isUiUpdateActive && isAdded() && isVisible()) {
                     uiUpdateHandler.postDelayed(this, 1000);
                 }
@@ -546,7 +763,6 @@ public class MusicFragment extends Fragment implements TrackChangeListener {
         });
     }
 
-    // Stop UI updates
     private void stopUiUpdates() {
         isUiUpdateActive = false;
         uiUpdateHandler.removeCallbacksAndMessages(null);
@@ -554,14 +770,11 @@ public class MusicFragment extends Fragment implements TrackChangeListener {
 
     @Override
     public void onDestroyView() {
-        // Unregister this fragment from track change events
         if (getActivity() instanceof MainActivity) {
             ((MainActivity) getActivity()).removeTrackChangeListener(this);
         }
 
-        // Stop UI updates
         stopUiUpdates();
-
         super.onDestroyView();
     }
 
@@ -574,8 +787,6 @@ public class MusicFragment extends Fragment implements TrackChangeListener {
     @Override
     public void onResume() {
         super.onResume();
-
-        // When fragment resumes, start UI updates if a track is playing
         if (musicPlayer.isPlaying()) {
             startUiUpdates();
         }
@@ -583,8 +794,146 @@ public class MusicFragment extends Fragment implements TrackChangeListener {
 
     @Override
     public void onPause() {
-        // When fragment pauses, stop UI updates
         stopUiUpdates();
         super.onPause();
+    }
+
+    private void downloadTrack() {
+        if (currentTrack == null) {
+            Toast.makeText(getContext(), "No track selected", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (currentTrack.getPreviewUrl() == null || currentTrack.getPreviewUrl().isEmpty()) {
+            Toast.makeText(getContext(), "No preview URL available for this track", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (currentTrack.isDownloaded()) {
+            Toast.makeText(getContext(), "Track already downloaded", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Toast.makeText(getContext(), "Starting download...", Toast.LENGTH_SHORT).show();
+        Log.d(TAG, "Starting download for: " + currentTrack.getTitle());
+
+        MusicDownloader.downloadTrack(requireContext(), currentTrack,
+                new MusicDownloader.DownloadCallback() {
+                    @Override
+                    public void onDownloadStarted() {
+                        if (isAdded()) {
+                            requireActivity().runOnUiThread(() -> {
+                                btnDownload.setEnabled(false);
+                                btnDownload.setAlpha(0.5f);
+                                Log.d(TAG, "Download started for: " + currentTrack.getTitle());
+                            });
+                        }
+                    }
+                    @Override
+                    public void onDownloadProgress(int progress) {
+                        Log.d(TAG, "Download progress: " + progress + "%");
+                    }
+
+                    @Override
+                    public void onDownloadComplete(File downloadedFile) {
+                        if (isAdded()) {
+                            requireActivity().runOnUiThread(() -> {
+                                btnDownload.setEnabled(true);
+                                btnDownload.setAlpha(1.0f);
+
+                                Log.d(TAG, "Download completed: " + downloadedFile.getAbsolutePath());
+
+                                if (currentTrack != null) {
+                                    if (!(currentTrack instanceof DownloadedTrack)) {
+                                        Log.d(TAG, "Converting regular Track to DownloadedTrack");
+                                    }
+                                    Log.d(TAG, "Marking track as downloaded: " + currentTrack.getTitle());
+                                }
+                                UserPreferencesManager.addToDownloadHistoryAsync(
+                                        requireContext(),
+                                        currentTrack,
+                                        downloadedFile.getAbsolutePath(),
+                                        new UserPreferencesManager.DataCallback<Boolean>() {
+                                            @Override
+                                            public void onSuccess(Boolean success) {
+                                                Log.d(TAG, "✅ Successfully synced download to cloud: " + currentTrack.getTitle());
+                                                requireActivity().runOnUiThread(() -> {
+                                                    updateDownloadButtonState();
+                                                });
+                                            }
+                                            @Override
+                                            public void onError(String error) {
+                                                Log.w(TAG, "❌ Failed to sync download to cloud: " + error);
+                                                requireActivity().runOnUiThread(() -> {
+                                                    updateDownloadButtonState();
+                                                });
+                                            }
+                                        }
+                                );
+
+                                Toast.makeText(getContext(),
+                                        "Download complete: " + currentTrack.getTitle(),
+                                        Toast.LENGTH_SHORT).show();
+
+                                if (getActivity() instanceof MainActivity) {
+                                    MainActivity mainActivity = (MainActivity) getActivity();
+                                    mainActivity.refreshDownloadedMusic();
+                                    mainActivity.notifyDownloadCompleted(currentTrack);
+                                }
+                                updateDownloadButtonState();
+                            });
+                        }
+                    }
+                    @Override
+                    public void onDownloadError(String message) {
+                        if (isAdded()) {
+                            requireActivity().runOnUiThread(() -> {
+                                btnDownload.setEnabled(true);
+                                btnDownload.setAlpha(1.0f);
+
+                                Log.e(TAG, "Download failed: " + message);
+                                Toast.makeText(getContext(),
+                                        "Download failed: " + message,
+                                        Toast.LENGTH_SHORT).show();
+                            });
+                        }
+                    }
+                });
+    }
+    private void updateDownloadButtonState() {
+        if (currentTrack == null || btnDownload == null) return;
+        Log.d(TAG, "Updating download button state for: " + currentTrack.getTitle());
+        boolean isDownloaded = checkIfTrackIsDownloaded(currentTrack);
+        Log.d(TAG, "Track " + currentTrack.getTitle() + " is downloaded: " + isDownloaded);
+        if (isDownloaded) {
+            btnDownload.setImageResource(R.drawable.ic_downloaded);
+            btnDownload.setAlpha(0.6f);
+            btnDownload.setEnabled(false);
+        } else {
+            btnDownload.setImageResource(R.drawable.ic_download);
+            btnDownload.setAlpha(1.0f);
+            btnDownload.setEnabled(true);
+        }
+    }
+
+    private boolean checkIfTrackIsDownloaded(Track track) {
+        if (track == null) return false;
+        if (track instanceof DownloadedTrack) {
+            return track.isDownloaded();
+        }
+        try {
+            DownloadedMusicDbHelper dbHelper =
+                    new DownloadedMusicDbHelper(requireContext());
+            java.util.List<Track> localTracks =
+                    com.example.melodix.fragment.DownloadedMusicFragment.getDownloadedTracksFromDb(dbHelper);
+
+            for (Track localTrack : localTracks) {
+                if (localTrack.getId() == track.getId()) {
+                    Log.d(TAG, "Track found in local database: " + track.getTitle());
+                    return true;
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error checking local database: " + e.getMessage());
+        }
+
+        return false;
     }
 }

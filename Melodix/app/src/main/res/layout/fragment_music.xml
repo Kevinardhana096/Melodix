@@ -8,19 +8,6 @@
 
     <!-- Top Bar -->
 
-    <TextView
-        android:id="@+id/tvSongTitle"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
-        android:text="Ophelia by Steven"
-        android:textColor="?android:textColorPrimary"
-        android:textSize="18sp"
-        app:layout_constraintEnd_toStartOf="@+id/btnFavoriteTop"
-        app:layout_constraintHorizontal_bias="0.63"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
-
     <ImageButton
         android:id="@+id/btnFavoriteTop"
         android:layout_width="48dp"
@@ -40,14 +27,14 @@
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:layout_marginStart="32dp"
-        android:layout_marginTop="32dp"
         android:layout_marginEnd="32dp"
         app:cardCornerRadius="16dp"
         app:cardElevation="8dp"
+        app:layout_constraintTop_toBottomOf="@+id/btnFavoriteTop"
         app:layout_constraintDimensionRatio="1:1"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/tvSongTitle">
+        tools:layout_editor_absoluteY="80dp">
 
         <ImageView
             android:id="@+id/imgAlbumArt"
@@ -65,6 +52,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="24dp"
         android:text="Ophelia"
+        android:textAlignment="center"
         android:textColor="?android:textColorPrimary"
         android:textSize="24sp"
         android:textStyle="bold"

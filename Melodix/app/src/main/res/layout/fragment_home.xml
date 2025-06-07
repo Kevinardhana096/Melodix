@@ -198,181 +198,32 @@
                     app:layout_constraintTop_toTopOf="parent" />
 
 
-                <HorizontalScrollView
-                    android:id="@+id/scroll_recently_played"
+                <!-- No Recently Played Text -->
+                <TextView
+                    android:id="@+id/txt_no_recently_played"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="16dp"
+                    android:gravity="center"
+                    android:padding="16dp"
+                    android:text="No recently played tracks"
+                    android:textColor="?android:textColorSecondary"
+                    android:textSize="16sp"
+                    android:visibility="gone"
+                    app:layout_constraintTop_toBottomOf="@id/txt_recently_played" />
+
+                <!-- RecyclerView for Recently Played -->
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/recycler_recently_played"
+                    android:layout_width="match_parent"
+                    android:layout_height="200dp"
+                    android:layout_marginTop="16dp"
                     android:clipToPadding="false"
+                    android:orientation="horizontal"
                     android:paddingStart="16dp"
                     android:paddingEnd="16dp"
                     android:scrollbars="none"
-                    app:layout_constraintTop_toBottomOf="@id/txt_recently_played">
-
-                    <LinearLayout
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal">
-
-                        <!-- Recently Played Item 1 -->
-                        <androidx.cardview.widget.CardView
-                            android:layout_width="140dp"
-                            android:layout_height="190dp"
-                            android:layout_marginEnd="16dp"
-                            app:cardCornerRadius="16dp"
-                            app:cardElevation="2dp">
-
-                            <androidx.constraintlayout.widget.ConstraintLayout
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent">
-
-                                <ImageView
-                                    android:id="@+id/img_album1"
-                                    android:layout_width="match_parent"
-                                    android:layout_height="140dp"
-                                    android:scaleType="centerCrop"
-                                    android:src="@drawable/ic_launcher_background"
-                                    app:layout_constraintTop_toTopOf="parent" />
-
-                                <TextView
-                                    android:id="@+id/txt_song_name1"
-                                    android:layout_width="match_parent"
-                                    android:layout_height="wrap_content"
-                                    android:ellipsize="end"
-                                    android:maxLines="1"
-                                    android:paddingStart="8dp"
-                                    android:paddingTop="6dp"
-                                    android:paddingEnd="8dp"
-                                    android:text="The Triangle"
-                                    android:textAlignment="center"
-                                    android:textColor="?android:textColorPrimary"
-                                    android:textSize="14sp"
-                                    android:textStyle="bold"
-                                    app:layout_constraintTop_toBottomOf="@id/img_album1" />
-
-                                <TextView
-                                    android:id="@+id/txt_artist_name1"
-                                    android:layout_width="match_parent"
-                                    android:layout_height="wrap_content"
-                                    android:ellipsize="end"
-                                    android:maxLines="1"
-                                    android:paddingStart="8dp"
-                                    android:paddingEnd="8dp"
-                                    android:text="Artist name"
-                                    android:textAlignment="center"
-                                    android:textColor="?android:textColorSecondary"
-                                    android:textSize="12sp"
-                                    app:layout_constraintTop_toBottomOf="@id/txt_song_name1" />
-
-                            </androidx.constraintlayout.widget.ConstraintLayout>
-                        </androidx.cardview.widget.CardView>
-
-                        <!-- Recently Played Item 2 -->
-                        <androidx.cardview.widget.CardView
-                            android:layout_width="140dp"
-                            android:layout_height="190dp"
-                            android:layout_marginEnd="16dp"
-                            app:cardCornerRadius="16dp"
-                            app:cardElevation="2dp">
-
-                            <androidx.constraintlayout.widget.ConstraintLayout
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent">
-
-                                <ImageView
-                                    android:id="@+id/img_album2"
-                                    android:layout_width="match_parent"
-                                    android:layout_height="140dp"
-                                    android:scaleType="centerCrop"
-                                    android:src="@drawable/ic_launcher_background"
-                                    app:layout_constraintTop_toTopOf="parent" />
-
-                                <TextView
-                                    android:id="@+id/txt_song_name2"
-                                    android:layout_width="match_parent"
-                                    android:layout_height="wrap_content"
-                                    android:ellipsize="end"
-                                    android:maxLines="1"
-                                    android:paddingStart="8dp"
-                                    android:paddingTop="6dp"
-                                    android:paddingEnd="8dp"
-                                    android:text="Dune of Visa"
-                                    android:textAlignment="center"
-                                    android:textColor="?android:textColorPrimary"
-                                    android:textSize="14sp"
-                                    android:textStyle="bold"
-                                    app:layout_constraintTop_toBottomOf="@id/img_album2" />
-
-                                <TextView
-                                    android:id="@+id/txt_artist_name2"
-                                    android:layout_width="match_parent"
-                                    android:layout_height="wrap_content"
-                                    android:ellipsize="end"
-                                    android:maxLines="1"
-                                    android:paddingStart="8dp"
-                                    android:paddingEnd="8dp"
-                                    android:text="Artist name"
-                                    android:textAlignment="center"
-                                    android:textColor="?android:textColorSecondary"
-                                    android:textSize="12sp"
-                                    app:layout_constraintTop_toBottomOf="@id/txt_song_name2" />
-
-                            </androidx.constraintlayout.widget.ConstraintLayout>
-                        </androidx.cardview.widget.CardView>
-
-                        <!-- Recently Played Item 3 -->
-                        <androidx.cardview.widget.CardView
-                            android:layout_width="140dp"
-                            android:layout_height="190dp"
-                            app:cardCornerRadius="16dp"
-                            app:cardElevation="2dp">
-
-                            <androidx.constraintlayout.widget.ConstraintLayout
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent">
-
-                                <ImageView
-                                    android:id="@+id/img_album3"
-                                    android:layout_width="match_parent"
-                                    android:layout_height="140dp"
-                                    android:scaleType="centerCrop"
-                                    android:src="@drawable/ic_launcher_background"
-                                    app:layout_constraintTop_toTopOf="parent" />
-
-                                <TextView
-                                    android:id="@+id/txt_song_name3"
-                                    android:layout_width="match_parent"
-                                    android:layout_height="wrap_content"
-                                    android:ellipsize="end"
-                                    android:maxLines="1"
-                                    android:paddingStart="8dp"
-                                    android:paddingTop="6dp"
-                                    android:paddingEnd="8dp"
-                                    android:text="Riskitall"
-                                    android:textAlignment="center"
-                                    android:textColor="?android:textColorPrimary"
-                                    android:textSize="14sp"
-                                    android:textStyle="bold"
-                                    app:layout_constraintTop_toBottomOf="@id/img_album3" />
-
-                                <TextView
-                                    android:id="@+id/txt_artist_name3"
-                                    android:layout_width="match_parent"
-                                    android:layout_height="wrap_content"
-                                    android:ellipsize="end"
-                                    android:maxLines="1"
-                                    android:paddingStart="8dp"
-                                    android:paddingEnd="8dp"
-                                    android:text="Artist name"
-                                    android:textAlignment="center"
-                                    android:textColor="?android:textColorSecondary"
-                                    android:textSize="12sp"
-                                    app:layout_constraintTop_toBottomOf="@id/txt_song_name3" />
-
-                            </androidx.constraintlayout.widget.ConstraintLayout>
-                        </androidx.cardview.widget.CardView>
-                    </LinearLayout>
-                </HorizontalScrollView>
+                    app:layout_constraintTop_toBottomOf="@id/txt_recently_played" />
             </androidx.constraintlayout.widget.ConstraintLayout>
 
             <!-- New Music Section with improved design -->
@@ -388,7 +239,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="16dp"
-                    android:text="New Releases"
+                    android:text="New Music"
                     android:textColor="?android:textColorPrimary"
                     android:textSize="20sp"
                     android:textStyle="bold"
@@ -413,7 +264,53 @@
                     app:layout_constraintEnd_toEndOf="parent"
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintTop_toBottomOf="@id/txt_new_music" />
+                <LinearLayout
+                    android:id="@+id/error_container"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="32dp"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:padding="32dp"
+                    android:visibility="gone"
+                    app:layout_constraintTop_toBottomOf="@id/txt_new_music"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent">
+
+                    <ImageView
+                        android:layout_width="64dp"
+                        android:layout_height="64dp"
+                        android:src="@drawable/ic_wifi_off"
+                        android:alpha="0.6"
+                        android:layout_marginBottom="16dp"
+                        app:tint="?android:textColorSecondary" />
+
+                    <TextView
+                        android:id="@+id/txt_error_message"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="No internet connection"
+                        android:textSize="16sp"
+                        android:textAlignment="center"
+                        android:layout_marginBottom="16dp"
+                        android:alpha="0.8"
+                        android:textColor="?android:textColorSecondary" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_refresh"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Refresh"
+                        android:drawableLeft="@drawable/ic_refresh"
+                        android:drawablePadding="8dp"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        app:icon="@drawable/ic_refresh"
+                        app:iconPadding="8dp" />
+
+                </LinearLayout>
             </androidx.constraintlayout.widget.ConstraintLayout>
+
+
         </androidx.constraintlayout.widget.ConstraintLayout>
     </androidx.core.widget.NestedScrollView>
 

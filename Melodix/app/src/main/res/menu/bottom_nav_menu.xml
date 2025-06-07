@@ -11,10 +11,10 @@
     <item
         android:id="@+id/nav_favorite"
         android:icon="@drawable/ic_favorite"
-        android:title="favorite" />
+        android:title="Favorite" />
     <item
-        android:id="@+id/nav_collection_music"
-        android:icon="@drawable/ic_collection_music"
-        android:title="collection music" />" />
+        android:id="@+id/nav_downloaded"
+        android:icon="@drawable/ic_downloaded_music"
+        android:title="Downloaded" />
 </menu>
 
