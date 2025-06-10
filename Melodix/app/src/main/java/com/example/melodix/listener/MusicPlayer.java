@@ -67,14 +67,6 @@ public class MusicPlayer {
             }
             return true;
         });
-        mediaPlayer.setOnPreparedListener(mp -> {
-            isPrepared = true;
-            if (playbackStatusListener != null) {
-                playbackStatusListener.onPrepareComplete();
-                playbackStatusListener.onDurationChanged(mp.getDuration());
-            }
-            play();
-        });
     }
     public static synchronized MusicPlayer getInstance() {
         if (instance == null) {
@@ -782,4 +774,3 @@ public class MusicPlayer {
         return new ArrayList<>(playlist);
     }
 }
-

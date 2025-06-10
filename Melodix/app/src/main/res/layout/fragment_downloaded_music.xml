@@ -44,25 +44,6 @@
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toBottomOf="@+id/title_downloaded" />
 
-            <com.google.android.material.card.MaterialCardView
-                android:id="@+id/search_card"
-                android:layout_width="match_parent"
-                android:layout_height="56dp"
-                android:layout_marginTop="16dp"
-                app:cardCornerRadius="28dp"
-                app:cardElevation="2dp"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@+id/subtitle_downloaded">
-
-                <androidx.appcompat.widget.SearchView
-                    android:id="@+id/search_view"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:iconifiedByDefault="false"
-                    android:queryHint="Search in downloaded music" />
-            </com.google.android.material.card.MaterialCardView>
-
             <TextView
                 android:id="@+id/downloaded_count"
                 android:layout_width="wrap_content"
@@ -71,19 +52,8 @@
                 android:textColor="?android:textColorSecondary"
                 android:textSize="14sp"
                 app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@+id/search_card"
+                app:layout_constraintTop_toBottomOf="@+id/subtitle_downloaded"
                 tools:text="24 items" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/sort_button"
-                style="@style/Widget.MaterialComponents.Button.TextButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Recent"
-                android:textAllCaps="false"
-                app:icon="@android:drawable/arrow_down_float"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintTop_toBottomOf="@+id/search_card" />
         </androidx.constraintlayout.widget.ConstraintLayout>
     </com.google.android.material.appbar.AppBarLayout>
 

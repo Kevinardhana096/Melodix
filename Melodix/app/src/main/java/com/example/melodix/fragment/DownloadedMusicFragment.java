@@ -1,5 +1,6 @@
 package com.example.melodix.fragment;
 
+import android.app.Activity;
 import android.content.Intent;
 import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
@@ -53,6 +54,34 @@ public class DownloadedMusicFragment extends Fragment {
     private DownloadedMusicAdapter adapter;
     private boolean isFragmentVisible = false;
     private boolean needsRefresh = false;
+    private boolean isFragmentActive = false;
+    private boolean isViewCreated = false;
+    private boolean isFragmentSafe() {
+        return isAdded() && getActivity() != null && isFragmentActive && isViewCreated && !isDetached();
+    }
+
+    private void safeRunOnUiThread(Runnable action) {
+        if (!isFragmentSafe()) {
+            Log.w(TAG, "Fragment not safe for UI updates, skipping action");
+            return;
+        }
+
+        try {
+            Activity activity = getActivity();
+            if (activity != null) {
+                activity.runOnUiThread(() -> {
+                    // Double-check before executing
+                    if (isFragmentSafe()) {
+                        action.run();
+                    } else {
+                        Log.w(TAG, "Fragment became unsafe during UI update");
+                    }
+                });
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error in safe UI update", e);
+        }
+    }
 
     @Override
     public void setUserVisibleHint(boolean isVisibleToUser) {
@@ -75,12 +104,10 @@ public class DownloadedMusicFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
+        isViewCreated = true;
 
         initializeViews(view);
         setupRecyclerView();
-        setupSearchView();
-        setupSortButton();
-
         loadDownloadedTracks();
     }
 
@@ -88,9 +115,7 @@ public class DownloadedMusicFragment extends Fragment {
         recyclerView = view.findViewById(R.id.downloads_recycler_view);
         emptyStateContainer = view.findViewById(R.id.empty_state_container);
         loadingProgress = view.findViewById(R.id.loading_progress);
-        searchView = view.findViewById(R.id.search_view);
         downloadedCount = view.findViewById(R.id.downloaded_count);
-        sortButton = view.findViewById(R.id.sort_button);
 
         MaterialButton exploreButton = view.findViewById(R.id.explore_button);
         exploreButton.setOnClickListener(v -> navigateToHome());
@@ -102,26 +127,6 @@ public class DownloadedMusicFragment extends Fragment {
         recyclerView.setAdapter(adapter);
         recyclerView.addItemDecoration(new DividerItemDecoration(
                 requireContext(), DividerItemDecoration.VERTICAL));
-    }
-
-    private void setupSearchView() {
-        searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
-            @Override
-            public boolean onQueryTextSubmit(String query) {
-                filterDownloads(query);
-                return true;
-            }
-            @Override
-            public boolean onQueryTextChange(String newText) {
-                filterDownloads(newText);
-                return true;
-            }
-        });
-    }
-    private void setupSortButton() {
-        sortButton.setOnClickListener(v -> {
-            showSortOptionsMenu();
-        });
     }
 
     private void showSortOptionsMenu() {
@@ -147,7 +152,9 @@ public class DownloadedMusicFragment extends Fragment {
             List<Track> localTracks = getDownloadedTracksFromDb(dbHelper, userId);
 
             Log.d(TAG, "Found " + localTracks.size() + " local tracks");
-            requireActivity().runOnUiThread(() -> {
+
+            // ✅ FIX: Use safe UI update method
+            safeRunOnUiThread(() -> {
                 if (localTracks.size() > 0) {
                     downloadedTracks = localTracks;
                     if (adapter != null) {
@@ -168,24 +175,35 @@ public class DownloadedMusicFragment extends Fragment {
     private void loadCloudTracksSecond() {
         Log.d(TAG, "Loading cloud tracks for sync...");
 
+        // ✅ FIX: Check fragment safety before starting async operation
+        if (!isFragmentSafe()) {
+            Log.w(TAG, "Fragment not safe, cannot load cloud tracks");
+            return;
+        }
+
         UserPreferencesManager.getDownloadHistoryAsync(requireContext(), new UserPreferencesManager.DataCallback<List<Track>>() {
             @Override
             public void onSuccess(List<Track> cloudHistory) {
                 Log.d(TAG, "Successfully loaded " + cloudHistory.size() + " tracks from cloud");
 
-                requireActivity().runOnUiThread(() -> {
-                    if (loadingProgress != null) {
-                        loadingProgress.setVisibility(View.GONE);
-                    }
+                // ✅ FIX: Use safe UI update method instead of requireActivity()
+                safeRunOnUiThread(() -> {
+                    try {
+                        if (loadingProgress != null) {
+                            loadingProgress.setVisibility(View.GONE);
+                        }
 
-                    List<Track> mergedTracks = mergeLocalAndCloudTracks(downloadedTracks, cloudHistory);
-                    downloadedTracks = mergedTracks;
+                        List<Track> mergedTracks = mergeLocalAndCloudTracks(downloadedTracks, cloudHistory);
+                        downloadedTracks = mergedTracks;
 
-                    if (adapter != null) {
-                        adapter.setTracks(downloadedTracks);
-                        updateDownloadCount(downloadedTracks.size());
-                        showEmptyState(downloadedTracks.isEmpty());
-                        Log.d(TAG, "UI updated with merged tracks: " + downloadedTracks.size());
+                        if (adapter != null) {
+                            adapter.setTracks(downloadedTracks);
+                            updateDownloadCount(downloadedTracks.size());
+                            showEmptyState(downloadedTracks.isEmpty());
+                            Log.d(TAG, "UI updated with merged tracks: " + downloadedTracks.size());
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error updating UI with cloud tracks", e);
                     }
                 });
             }
@@ -194,25 +212,37 @@ public class DownloadedMusicFragment extends Fragment {
             public void onError(String error) {
                 Log.e(TAG, "Error loading cloud download history: " + error);
 
-                requireActivity().runOnUiThread(() -> {
-                    if (loadingProgress != null) {
-                        loadingProgress.setVisibility(View.GONE);
-                    }
-                    if (downloadedTracks.isEmpty()) {
-                        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
-                        String userId = currentUser != null ? currentUser.getUid() : "anonymous";
-
-                        DownloadedMusicDbHelper dbHelper = new DownloadedMusicDbHelper(requireContext());
-                        downloadedTracks = getDownloadedTracksFromDb(dbHelper, userId);
-
-                        if (adapter != null) {
-                            adapter.setTracks(downloadedTracks);
-                            updateDownloadCount(downloadedTracks.size());
-                            showEmptyState(downloadedTracks.isEmpty());
+                // ✅ FIX: Use safe UI update method instead of requireActivity()
+                safeRunOnUiThread(() -> {
+                    try {
+                        if (loadingProgress != null) {
+                            loadingProgress.setVisibility(View.GONE);
                         }
-                    }
 
-                    Toast.makeText(getContext(), "Showing local downloads (offline)", Toast.LENGTH_SHORT).show();
+                        if (downloadedTracks.isEmpty()) {
+                            // ✅ FIX: Check fragment safety before using requireContext()
+                            if (!isFragmentSafe()) {
+                                Log.w(TAG, "Fragment not safe for fallback operation");
+                                return;
+                            }
+
+                            FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+                            String userId = currentUser != null ? currentUser.getUid() : "anonymous";
+
+                            DownloadedMusicDbHelper dbHelper = new DownloadedMusicDbHelper(requireContext());
+                            downloadedTracks = getDownloadedTracksFromDb(dbHelper, userId);
+
+                            if (adapter != null) {
+                                adapter.setTracks(downloadedTracks);
+                                updateDownloadCount(downloadedTracks.size());
+                                showEmptyState(downloadedTracks.isEmpty());
+                            }
+                        }
+
+                        Toast.makeText(getContext(), "Showing local downloads (offline)", Toast.LENGTH_SHORT).show();
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error in error handling", e);
+                    }
                 });
             }
         });
@@ -254,8 +284,9 @@ public class DownloadedMusicFragment extends Fragment {
     public void onDownloadCompleted(Track completedTrack) {
         Log.d(TAG, "Download completed for: " + completedTrack.getTitle());
 
-        if (isFragmentVisible && isAdded()) {
-            requireActivity().runOnUiThread(() -> {
+        if (isFragmentVisible && isFragmentSafe()) {
+            // ✅ FIX: Use safe UI update method
+            safeRunOnUiThread(() -> {
                 boolean trackExists = false;
                 for (Track track : downloadedTracks) {
                     if (track.getId() == completedTrack.getId()) {
@@ -335,7 +366,12 @@ public class DownloadedMusicFragment extends Fragment {
         repository.searchTracks(searchQuery, new DeezerRepository.DataCallback<List<Track>>() {
             @Override
             public void onSuccess(List<Track> searchResults) {
-                if (!isAdded()) return;
+                // ✅ FIX: Check fragment safety before proceeding
+                if (!isFragmentSafe()) {
+                    Log.w(TAG, "Fragment not safe, cancelling track refresh");
+                    return;
+                }
+
                 Track refreshedTrack = findBestMatch(searchResults, outdatedTrack);
 
                 if (refreshedTrack != null && isTrackDownloadable(refreshedTrack)) {
@@ -343,14 +379,16 @@ public class DownloadedMusicFragment extends Fragment {
                     Log.d(TAG, "New URL: " + refreshedTrack.getPreviewUrl());
                     updateTrackForRedownload(outdatedTrack, refreshedTrack);
 
-                    requireActivity().runOnUiThread(() -> {
+                    // ✅ FIX: Use safe UI update method
+                    safeRunOnUiThread(() -> {
                         Toast.makeText(getContext(), "Track data refreshed, starting download", Toast.LENGTH_SHORT).show();
                         performActualDownload(outdatedTrack);
                     });
 
                 } else {
                     Log.e(TAG, "❌ Could not refresh track for re-download");
-                    requireActivity().runOnUiThread(() -> {
+                    // ✅ FIX: Use safe UI update method
+                    safeRunOnUiThread(() -> {
                         Toast.makeText(getContext(),
                                 "This track is no longer available for download",
                                 Toast.LENGTH_LONG).show();
@@ -361,13 +399,13 @@ public class DownloadedMusicFragment extends Fragment {
             @Override
             public void onError(String message) {
                 Log.e(TAG, "❌ Error refreshing track for re-download: " + message);
-                if (isAdded()) {
-                    requireActivity().runOnUiThread(() -> {
-                        Toast.makeText(getContext(),
-                                "Unable to refresh track data: " + message,
-                                Toast.LENGTH_SHORT).show();
-                    });
-                }
+
+                // ✅ FIX: Use safe UI update method
+                safeRunOnUiThread(() -> {
+                    Toast.makeText(getContext(),
+                            "Unable to refresh track data: " + message,
+                            Toast.LENGTH_SHORT).show();
+                });
             }
         });
     }
@@ -433,11 +471,18 @@ public class DownloadedMusicFragment extends Fragment {
         Log.d(TAG, "Starting actual download for: " + track.getTitle());
         Log.d(TAG, "Download URL: " + track.getPreviewUrl());
 
+        // ✅ FIX: Check fragment safety before starting download
+        if (!isFragmentSafe()) {
+            Log.w(TAG, "Fragment not safe, cannot start download");
+            return;
+        }
+
         MusicDownloader.downloadTrack(requireContext(), track,
                 new MusicDownloader.DownloadCallback() {
                     @Override
                     public void onDownloadStarted() {
-                        requireActivity().runOnUiThread(() -> {
+                        // ✅ FIX: Use safe UI update method
+                        safeRunOnUiThread(() -> {
                             Toast.makeText(getContext(), "Download started...", Toast.LENGTH_SHORT).show();
                             Log.d(TAG, "Download started for: " + track.getTitle());
                         });
@@ -450,28 +495,34 @@ public class DownloadedMusicFragment extends Fragment {
 
                     @Override
                     public void onDownloadComplete(File downloadedFile) {
-                        requireActivity().runOnUiThread(() -> {
+                        // ✅ FIX: Use safe UI update method
+                        safeRunOnUiThread(() -> {
                             Log.d(TAG, "✅ Download completed: " + downloadedFile.getAbsolutePath());
 
                             if (track instanceof DownloadedTrack) {
                                 ((DownloadedTrack) track).setDownloaded(true);
                             }
-                            UserPreferencesManager.addToDownloadHistoryAsync(
-                                    requireContext(),
-                                    track,
-                                    downloadedFile.getAbsolutePath(),
-                                    new UserPreferencesManager.DataCallback<Boolean>() {
-                                        @Override
-                                        public void onSuccess(Boolean success) {
-                                            Log.d(TAG, "✅ Added to cloud download history");
-                                        }
 
-                                        @Override
-                                        public void onError(String error) {
-                                            Log.w(TAG, "❌ Failed to add to cloud: " + error);
+                            // Safe context check for UserPreferencesManager
+                            if (isFragmentSafe()) {
+                                UserPreferencesManager.addToDownloadHistoryAsync(
+                                        requireContext(),
+                                        track,
+                                        downloadedFile.getAbsolutePath(),
+                                        new UserPreferencesManager.DataCallback<Boolean>() {
+                                            @Override
+                                            public void onSuccess(Boolean success) {
+                                                Log.d(TAG, "✅ Added to cloud download history");
+                                            }
+
+                                            @Override
+                                            public void onError(String error) {
+                                                Log.w(TAG, "❌ Failed to add to cloud: " + error);
+                                            }
                                         }
-                                    }
-                            );
+                                );
+                            }
+
                             if (adapter != null) {
                                 adapter.notifyDataSetChanged();
                             }
@@ -485,7 +536,8 @@ public class DownloadedMusicFragment extends Fragment {
 
                     @Override
                     public void onDownloadError(String message) {
-                        requireActivity().runOnUiThread(() -> {
+                        // ✅ FIX: Use safe UI update method
+                        safeRunOnUiThread(() -> {
                             Log.e(TAG, "❌ Download failed: " + message);
 
                             String userMessage;
@@ -624,7 +676,8 @@ public class DownloadedMusicFragment extends Fragment {
                 new UserPreferencesManager.DataCallback<Boolean>() {
                     @Override
                     public void onSuccess(Boolean success) {
-                        requireActivity().runOnUiThread(() -> {
+                        // ✅ FIX: Use safe UI update method
+                        safeRunOnUiThread(() -> {
                             updateUIAfterDeletion(track);
                             Toast.makeText(getContext(), "Removed from history", Toast.LENGTH_SHORT).show();
                         });
@@ -632,7 +685,8 @@ public class DownloadedMusicFragment extends Fragment {
 
                     @Override
                     public void onError(String error) {
-                        requireActivity().runOnUiThread(() -> {
+                        // ✅ FIX: Use safe UI update method
+                        safeRunOnUiThread(() -> {
                             Toast.makeText(getContext(), "Failed to remove from history", Toast.LENGTH_SHORT).show();
                         });
                     }
@@ -715,6 +769,12 @@ public class DownloadedMusicFragment extends Fragment {
     private void deleteFromDatabaseAndCloud(Track track) {
         Log.d(TAG, "=== DATABASE AND CLOUD CLEANUP ===");
 
+        // ✅ FIX: Check fragment safety before database operations
+        if (!isFragmentSafe()) {
+            Log.w(TAG, "Fragment not safe for database operations");
+            return;
+        }
+
         DownloadedMusicDbHelper dbHelper = new DownloadedMusicDbHelper(getContext());
         SQLiteDatabase db = null;
 
@@ -751,20 +811,24 @@ public class DownloadedMusicFragment extends Fragment {
                                 Log.w(TAG, "❌ Failed to remove from cloud: " + error);
                             }
                         });
-                requireActivity().runOnUiThread(() -> {
+
+                // ✅ FIX: Use safe UI update method
+                safeRunOnUiThread(() -> {
                     updateUIAfterDeletion(track);
                 });
 
             } else {
                 Log.w(TAG, "No rows deleted from database - track may not exist");
-                requireActivity().runOnUiThread(() -> {
+                // ✅ FIX: Use safe UI update method
+                safeRunOnUiThread(() -> {
                     Toast.makeText(getContext(), "Track not found in database", Toast.LENGTH_SHORT).show();
                 });
             }
 
         } catch (Exception e) {
             Log.e(TAG, "Error deleting from database: " + e.getMessage(), e);
-            requireActivity().runOnUiThread(() -> {
+            // ✅ FIX: Use safe UI update method
+            safeRunOnUiThread(() -> {
                 Toast.makeText(getContext(), "Error deleting track: " + e.getMessage(), Toast.LENGTH_SHORT).show();
             });
         } finally {
@@ -1047,12 +1111,21 @@ public class DownloadedMusicFragment extends Fragment {
     @Override
     public void onPause() {
         super.onPause();
+        isFragmentActive = false;
         isFragmentVisible = false;
+    }
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        isViewCreated = false;
+        isFragmentActive = false;
+        Log.d(TAG, "Fragment view destroyed");
     }
 
     @Override
     public void onResume() {
         super.onResume();
+        isFragmentActive = true;
         isFragmentVisible = true;
         Log.d(TAG, "Fragment resumed, refreshing data");
         debugDatabaseState();

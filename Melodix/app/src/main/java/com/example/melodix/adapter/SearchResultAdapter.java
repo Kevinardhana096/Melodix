@@ -25,7 +25,6 @@ public class SearchResultAdapter extends RecyclerView.Adapter<SearchResultAdapte
     private List<Track> searchResults;
     private OnSearchItemClickListener listener;
 
-    // ✅ OPTIMIZE: Add request options for Glide
     private static final RequestOptions GLIDE_OPTIONS = new RequestOptions()
             .placeholder(R.drawable.ic_launcher_background)
             .error(R.drawable.ic_launcher_background)
@@ -36,7 +35,6 @@ public class SearchResultAdapter extends RecyclerView.Adapter<SearchResultAdapte
         this.searchResults = new ArrayList<>();
         this.listener = listener;
 
-        // ✅ OPTIMIZE: Enable stable IDs for better performance
         setHasStableIds(true);
     }
 
@@ -63,14 +61,12 @@ public class SearchResultAdapter extends RecyclerView.Adapter<SearchResultAdapte
 
     @Override
     public long getItemId(int position) {
-        // ✅ OPTIMIZE: Use track ID for stable IDs
         if (position < searchResults.size()) {
             return searchResults.get(position).getId();
         }
         return RecyclerView.NO_ID;
     }
 
-    // ✅ OPTIMIZE: Use DiffUtil for efficient updates
     public void updateResults(List<Track> newResults) {
         Log.d(TAG, "=== UPDATING SEARCH RESULTS ===");
         Log.d(TAG, "Previous size: " + searchResults.size());

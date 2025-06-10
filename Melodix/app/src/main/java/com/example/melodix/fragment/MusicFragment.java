@@ -130,9 +130,16 @@ public class MusicFragment extends Fragment implements TrackChangeListener {
             public void onSuccess(List<Track> recentTracks) {
                 if (recentTracks != null && !recentTracks.isEmpty()) {
                     Track lastTrack = recentTracks.get(0);
-                    currentTrack = lastTrack;
-                    updateTrackUI(lastTrack);
-                    Log.d(TAG, "Loaded last played track: " + lastTrack.getTitle());
+
+                    // ✅ TAMBAHAN: Validasi URL sebelum memutar
+                    if (isTrackUrlValid(lastTrack)) {
+                        currentTrack = lastTrack;
+                        updateTrackUI(lastTrack);
+                        Log.d(TAG, "Loaded last played track: " + lastTrack.getTitle());
+                    } else {
+                        Log.w(TAG, "Track URL expired, refreshing: " + lastTrack.getTitle());
+                        refreshTrackUrl(lastTrack);
+                    }
                 }
             }
             @Override
@@ -141,10 +148,164 @@ public class MusicFragment extends Fragment implements TrackChangeListener {
                 List<Track> localRecent = UserPreferencesManager.getRecentTracks(requireContext());
                 if (localRecent != null && !localRecent.isEmpty()) {
                     Track lastTrack = localRecent.get(0);
-                    currentTrack = lastTrack;
-                    updateTrackUI(lastTrack);
-                    Log.d(TAG, "Loaded last played track from local: " + lastTrack.getTitle());
+
+                    // ✅ TAMBAHAN: Validasi URL untuk local tracks juga
+                    if (isTrackUrlValid(lastTrack)) {
+                        currentTrack = lastTrack;
+                        updateTrackUI(lastTrack);
+                        Log.d(TAG, "Loaded last played track from local: " + lastTrack.getTitle());
+                    } else {
+                        refreshTrackUrl(lastTrack);
+                    }
                 }
+            }
+        });
+    }
+    private boolean isTrackUrlValid(Track track) {
+        if (track == null || track.getPreviewUrl() == null || track.getPreviewUrl().isEmpty()) {
+            return false;
+        }
+
+        // Cek apakah ini URL Deezer yang expired
+        if (isDeezerUrl(track.getPreviewUrl())) {
+            return !isDeezerUrlExpired(track.getPreviewUrl());
+        }
+
+        return true;
+    }
+    private boolean isDeezerUrl(String url) {
+        return url != null && url.contains("dzcdn.net");
+    }
+    private boolean isDeezerUrlExpired(String url) {
+        try {
+            if (url.contains("exp=")) {
+                String[] parts = url.split("exp=");
+                if (parts.length > 1) {
+                    String expPart = parts[1].split("~")[0];
+                    long expTime = Long.parseLong(expPart);
+                    long currentTime = System.currentTimeMillis() / 1000;
+
+                    boolean isExpired = currentTime > expTime;
+                    Log.d(TAG, "URL expiration check - Current: " + currentTime + ", Expires: " + expTime + ", Expired: " + isExpired);
+                    return isExpired;
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Could not parse URL expiration: " + e.getMessage());
+        }
+        return false;
+    }
+    private void refreshTrackUrl(Track track) {
+        Log.d(TAG, "🔄 Refreshing expired URL for: " + track.getTitle());
+
+        DeezerRepository repository = DeezerRepository.getInstance();
+        String searchQuery = track.getTitle();
+        if (track.getArtist() != null) {
+            searchQuery += " " + track.getArtist().getName();
+        }
+
+        repository.searchTracks(searchQuery, new DeezerRepository.DataCallback<List<Track>>() {
+            @Override
+            public void onSuccess(List<Track> tracks) {
+                Track refreshedTrack = findMatchingTrack(tracks, track);
+
+                if (refreshedTrack != null && refreshedTrack.getPreviewUrl() != null) {
+                    // Update track dengan URL fresh
+                    track.setPreviewUrl(refreshedTrack.getPreviewUrl());
+                    currentTrack = track;
+                    updateTrackUI(track);
+
+                    // Update di recent tracks storage
+                    updateRecentTrackUrl(track);
+
+                    Log.d(TAG, "✅ Successfully refreshed URL for: " + track.getTitle());
+                } else {
+                    Log.w(TAG, "❌ Could not refresh URL for: " + track.getTitle());
+                    handleFailedTrackLoad();
+                }
+            }
+
+            @Override
+            public void onError(String message) {
+                Log.e(TAG, "❌ Error refreshing track URL: " + message);
+                handleFailedTrackLoad();
+            }
+        });
+    }
+    private Track findMatchingTrack(List<Track> tracks, Track originalTrack) {
+        if (tracks == null || tracks.isEmpty()) return null;
+
+        // Cari berdasarkan ID dulu
+        for (Track track : tracks) {
+            if (track.getId() == originalTrack.getId()) {
+                return track;
+            }
+        }
+
+        // Kalau tidak ada, cari berdasarkan title dan artist
+        for (Track track : tracks) {
+            if (track.getTitle().equalsIgnoreCase(originalTrack.getTitle()) &&
+                    track.getArtist() != null && originalTrack.getArtist() != null &&
+                    track.getArtist().getName().equalsIgnoreCase(originalTrack.getArtist().getName())) {
+                return track;
+            }
+        }
+
+        return null;
+    }
+    private void updateRecentTrackUrl(Track track) {
+        UserPreferencesManager.getRecentTracksAsync(requireContext(), new UserPreferencesManager.DataCallback<List<Track>>() {
+            @Override
+            public void onSuccess(List<Track> recentTracks) {
+                boolean updated = false;
+                for (Track recentTrack : recentTracks) {
+                    if (recentTrack.getId() == track.getId()) {
+                        recentTrack.setPreviewUrl(track.getPreviewUrl());
+                        updated = true;
+                        break;
+                    }
+                }
+
+                if (updated) {
+                    UserPreferencesManager.saveRecentTracksAsync(requireContext(), recentTracks, null);
+                    Log.d(TAG, "Updated recent tracks with fresh URL");
+                }
+            }
+
+            @Override
+            public void onError(String error) {
+                Log.e(TAG, "Error updating recent tracks: " + error);
+            }
+        });
+    }
+    private void handleFailedTrackLoad() {
+        Log.d(TAG, "Handling failed track load, trying to load alternative track");
+
+        UserPreferencesManager.getRecentTracksAsync(requireContext(), new UserPreferencesManager.DataCallback<List<Track>>() {
+            @Override
+            public void onSuccess(List<Track> recentTracks) {
+                if (recentTracks != null && recentTracks.size() > 1) {
+                    // Coba track berikutnya di recent tracks
+                    for (int i = 1; i < recentTracks.size(); i++) {
+                        Track nextTrack = recentTracks.get(i);
+                        if (isTrackUrlValid(nextTrack)) {
+                            currentTrack = nextTrack;
+                            updateTrackUI(nextTrack);
+                            Log.d(TAG, "Loaded alternative track: " + nextTrack.getTitle());
+                            return;
+                        }
+                    }
+                }
+
+                // Kalau semua recent tracks bermasalah, load track baru
+                Toast.makeText(getContext(), "Recent tracks unavailable, loading new music...", Toast.LENGTH_SHORT).show();
+                loadMoreTracksToPlaylist(true);
+            }
+
+            @Override
+            public void onError(String error) {
+                Log.e(TAG, "Error loading alternative track: " + error);
+                loadMoreTracksToPlaylist(true);
             }
         });
     }
@@ -531,6 +692,7 @@ public class MusicFragment extends Fragment implements TrackChangeListener {
                 }
                 final boolean wasFavorite = isCurrentlyFavorite;
                 if (wasFavorite) {
+                    // Remove from favorites
                     mutableFavorites.removeIf(track -> track.getId() == trackToToggle.getId());
                     UserPreferencesManager.saveFavoriteTracksAsync(requireContext(), mutableFavorites, new UserPreferencesManager.DataCallback<Boolean>() {
                         @Override
@@ -538,7 +700,8 @@ public class MusicFragment extends Fragment implements TrackChangeListener {
                             if (isAdded()) {
                                 requireActivity().runOnUiThread(() -> {
                                     Toast.makeText(getContext(), "Removed from favorites", Toast.LENGTH_SHORT).show();
-                                    btnFavoriteTop.setImageResource(R.drawable.ic_favorite_filled);
+                                    // PERBAIKAN: Ganti ke icon kosong (outline) karena sudah di-remove
+                                    btnFavoriteTop.setImageResource(R.drawable.ic_favorite);
                                     if (getActivity() instanceof MainActivity) {
                                         ((MainActivity) getActivity()).notifyFavoriteChanged();
                                     }
@@ -557,6 +720,7 @@ public class MusicFragment extends Fragment implements TrackChangeListener {
                     });
 
                 } else {
+                    // Add to favorites
                     mutableFavorites.add(trackToToggle);
                     UserPreferencesManager.saveFavoriteTracksAsync(requireContext(), mutableFavorites, new UserPreferencesManager.DataCallback<Boolean>() {
                         @Override
@@ -564,7 +728,8 @@ public class MusicFragment extends Fragment implements TrackChangeListener {
                             if (isAdded()) {
                                 requireActivity().runOnUiThread(() -> {
                                     Toast.makeText(getContext(), "Added to favorites", Toast.LENGTH_SHORT).show();
-                                    btnFavoriteTop.setImageResource(R.drawable.ic_favorite);
+                                    // PERBAIKAN: Ganti ke icon filled karena sudah di-add
+                                    btnFavoriteTop.setImageResource(R.drawable.ic_favorite_filled);
                                     if (getActivity() instanceof MainActivity) {
                                         ((MainActivity) getActivity()).notifyFavoriteChanged();
                                     }
@@ -615,8 +780,11 @@ public class MusicFragment extends Fragment implements TrackChangeListener {
 
                 if (isAdded()) {
                     requireActivity().runOnUiThread(() -> {
+                        // PERBAIKAN: Logika yang benar
+                        // Jika favorite = tampilkan icon filled (ic_favorite)
+                        // Jika tidak favorite = tampilkan icon outline (ic_favorite_filled)
                         btnFavoriteTop.setImageResource(trackIsFavorite ?
-                                R.drawable.ic_favorite : R.drawable.ic_favorite_filled);
+                                R.drawable.ic_favorite_filled : R.drawable.ic_favorite);
                     });
                 }
             }
@@ -635,8 +803,9 @@ public class MusicFragment extends Fragment implements TrackChangeListener {
 
                 if (isAdded()) {
                     requireActivity().runOnUiThread(() -> {
+                        // PERBAIKAN: Logika yang sama untuk error case
                         btnFavoriteTop.setImageResource(trackIsFavorite ?
-                                R.drawable.ic_favorite : R.drawable.ic_favorite_filled);
+                                R.drawable.ic_favorite_filled : R.drawable.ic_favorite);
                     });
                 }
             }
@@ -937,3 +1106,6 @@ public class MusicFragment extends Fragment implements TrackChangeListener {
         return false;
     }
 }
+
+
+

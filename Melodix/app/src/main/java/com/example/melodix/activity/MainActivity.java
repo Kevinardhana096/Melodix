@@ -48,7 +48,7 @@ public class MainActivity extends AppCompatActivity {
     private int currentDownloadedIndex = -1;
     private String lastAddedTrackId = "";
     private long lastAddedTime = 0;
-    private static final long ADD_RECENT_DEBOUNCE_MS = 2000; // 2 detik
+    private static final long ADD_RECENT_DEBOUNCE_MS = 2000;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -104,7 +104,7 @@ public class MainActivity extends AppCompatActivity {
             bottomNavigation.setSelectedItemId(R.id.nav_home);
         }
 
-        String currentUserId = getCurrentUserId(); // Method untuk get current user ID
+        String currentUserId = getCurrentUserId();
         String prefKey = "is_first_login_" + currentUserId;
 
         boolean isFirstLoginOnDevice = getSharedPreferences("app_prefs", MODE_PRIVATE)
@@ -546,7 +546,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void addToRecentlyPlayedAsync(Track track) {
-        // GANTI DENGAN LOCAL-ONLY
         addToRecentlyPlayed(track);
     }
     public void addToRecentlyPlayed(Track track) {
@@ -555,7 +554,6 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        // Tambah debounce untuk prevent duplikasi
         String trackId = String.valueOf(track.getId());
         long currentTime = System.currentTimeMillis();
 
@@ -571,14 +569,9 @@ public class MainActivity extends AppCompatActivity {
 
         try {
             List<Track> recentTracks = UserPreferencesManager.getRecentTracks(this);
-
-            // Remove existing track dengan ID yang sama
             recentTracks.removeIf(t -> t != null && t.getId() == track.getId());
-
-            // Add to beginning
             recentTracks.add(0, track);
 
-            // Limit to 10 items
             if (recentTracks.size() > 10) {
                 recentTracks = new ArrayList<>(recentTracks.subList(0, 10));
             }
@@ -586,10 +579,7 @@ public class MainActivity extends AppCompatActivity {
             Log.d(TAG, "Adding track to recently played LOCAL ONLY: " + track.getTitle() +
                     " (total: " + recentTracks.size() + ")");
 
-            // HANYA SIMPAN LOCAL - JANGAN SYNC KE CLOUD
             UserPreferencesManager.saveRecentTracks(this, recentTracks);
-
-            // Refresh UI
             if (currentFragment instanceof HomeFragment && homeFragment != null) {
                 runOnUiThread(() -> homeFragment.refreshRecentlyPlayed());
             }
@@ -603,11 +593,9 @@ public class MainActivity extends AppCompatActivity {
         Log.d(TAG, "Clearing recently played for new device");
 
         try {
-            // Clear local recent tracks
             UserPreferencesManager.saveRecentTracks(this, new ArrayList<>());
             Log.d(TAG, "✅ Local recent tracks cleared");
 
-            // Clear any cached data yang mungkin ada
             getSharedPreferences("recent_tracks", MODE_PRIVATE)
                     .edit()
                     .clear()

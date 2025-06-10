@@ -37,13 +37,10 @@ import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
 
 public class ProfileActivity extends AppCompatActivity {
     private static final String TAG = "ProfileActivity";
-
     private FirebaseAuth mAuth;
-
     private ImageView imgBack;
     private ImageView profileImage;
     private TextView tvUploadProfilePicture;
@@ -54,12 +51,9 @@ public class ProfileActivity extends AppCompatActivity {
     private MaterialButton btnSaveProfile;
     private MaterialButton btnLogout;
     private ProgressBar progressBarUpload;
-
     private Uri selectedImageUri;
     private boolean isUploadingImage = false;
     private String currentProfileImageUrl = "";
-
-    // Activity result launchers for image selection
     private ActivityResultLauncher<Intent> imagePickerLauncher;
     private ActivityResultLauncher<Intent> cameraLauncher;
     private ActivityResultLauncher<String> permissionLauncher;
@@ -70,7 +64,6 @@ public class ProfileActivity extends AppCompatActivity {
         setContentView(R.layout.activity_profile);
 
         mAuth = FirebaseAuth.getInstance();
-
 
         initializeViews();
         initializeActivityLaunchers();
@@ -121,8 +114,6 @@ public class ProfileActivity extends AppCompatActivity {
                                     .load(selectedImageUri)
                                     .placeholder(R.drawable.ic_launcher_foreground)
                                     .into(profileImage);
-
-                            // Process image (convert to Base64)
                             processSelectedImage(selectedImageUri);
                         }
                     }
@@ -139,10 +130,7 @@ public class ProfileActivity extends AppCompatActivity {
                         if (extras != null) {
                             Bitmap imageBitmap = (Bitmap) extras.get("data");
                             if (imageBitmap != null) {
-                                // Show captured image immediately
                                 profileImage.setImageBitmap(imageBitmap);
-
-                                // Convert bitmap to Base64 and upload
                                 processCapturedImage(imageBitmap);
                             }
                         }
@@ -151,8 +139,6 @@ public class ProfileActivity extends AppCompatActivity {
                     }
                 }
         );
-
-        // Permission launcher
         permissionLauncher = registerForActivityResult(
                 new ActivityResultContracts.RequestPermission(),
                 isGranted -> {
@@ -408,8 +394,6 @@ public class ProfileActivity extends AppCompatActivity {
     }
 
     private void updateFirebaseAuthPhoto(String base64Image) {
-        // Firebase Auth doesn't support Base64 images directly
-        // We'll skip this for Base64 approach, or only update display name
         FirebaseUser user = mAuth.getCurrentUser();
         if (user != null) {
             // Just complete the upload process
@@ -418,8 +402,6 @@ public class ProfileActivity extends AppCompatActivity {
 
             Log.d(TAG, "Profile image updated successfully (Base64 stored in Firestore)");
             Toast.makeText(ProfileActivity.this, "Profile picture updated successfully", Toast.LENGTH_SHORT).show();
-
-            // Image already displayed via loadBase64Image, no need to reload
         }
     }
 

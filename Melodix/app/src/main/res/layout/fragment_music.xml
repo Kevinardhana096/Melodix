@@ -18,8 +18,7 @@
         android:contentDescription="Favorite"
         android:src="@drawable/ic_favorite"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        app:tint="?android:textColorPrimary" />
+        app:layout_constraintTop_toTopOf="parent" />
 
     <!-- Album Art -->
     <androidx.cardview.widget.CardView
@@ -167,22 +166,6 @@
         app:layout_constraintBottom_toBottomOf="@+id/btnPlayPause"
         app:layout_constraintStart_toEndOf="@+id/btnPlayPause"
         app:layout_constraintTop_toTopOf="@+id/btnPlayPause"
-        app:tint="?android:textColorPrimary" />
-
-    <ImageButton
-        android:id="@+id/btnRepeat"
-        android:layout_width="48dp"
-        android:layout_height="48dp"
-        android:layout_marginStart="24dp"
-        android:background="?attr/selectableItemBackgroundBorderless"
-        android:contentDescription="Repeat"
-        android:src="@drawable/ic_repeat"
-        app:layout_constraintBottom_toBottomOf="@+id/btnNext"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.172"
-        app:layout_constraintStart_toEndOf="@+id/btnNext"
-        app:layout_constraintTop_toTopOf="@+id/btnNext"
-        app:layout_constraintVertical_bias="0.0"
         app:tint="?android:textColorPrimary" />
 
 
