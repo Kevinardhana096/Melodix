@@ -163,7 +163,7 @@ app/src/main/java/com/example/melodix/
 
 1. **Clone Repository**
    ```bash
-   git clone https://github.com/mobilesaperhenibus/Melodix1.git
+   git clone https://github.com/kevinardhana096/Melodix.git
    cd Melodix1
    ```
 
@@ -239,8 +239,8 @@ Project ini menggunakan lisensi MIT. Lihat file `LICENSE` untuk detail lengkap.
 
 ## Kontak
 
-Dikembangkan oleh: mobilesaperhenibus
-GitHub: https://github.com/mobilesaperhenibus/Melodix1
+Dikembangkan oleh: Kevin Ardhana
+GitHub: https://github.com/kevinardhana096/Melodix
 
 ---
 
